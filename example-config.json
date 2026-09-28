@@ -1,0 +1,13 @@
+{
+  "header": { "icon": "🍕", "label": "Dinner Tonight", "labelColor": "#ffd166", "pillColor": "#2b1a3d" },
+  "title": { "color": "#ffffff", "size": 84 },
+  "background": { "type": "gradient", "color": "#3a0ca3", "color2": "#0b0014", "angle": 180 },
+  "wheel": { "colorMode": "cycle", "colors": ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#8338ec"], "labelColor": "#101010", "labelWeight": 700, "rimColor": "#1a0f26", "hubColor": "#1a0f26" },
+  "segments": [
+    { "label": "Pizza", "weight": 1 }, { "label": "Sushi", "weight": 1 }, { "label": "Tacos", "weight": 1 },
+    { "label": "Burgers", "weight": 1 }, { "label": "Ramen", "weight": 1 }, { "label": "Curry", "weight": 1 },
+    { "label": "Pasta", "weight": 1 }, { "label": "Salad", "weight": 1 }, { "label": "Injera", "weight": 1 }, { "label": "Kebab", "weight": 1 }
+  ],
+  "spin": { "duration": 6, "rotations": 10, "deceleration": 3 },
+  "result": { "mode": "random", "dimLosers": true, "dimAmount": 0.6, "pop": true }
+}

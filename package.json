@@ -1,0 +1,8 @@
+{
+  "name": "spin-wheel-template",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Customizable spin wheel video template",
+  "scripts": { "render": "node render.mjs" },
+  "dependencies": { "playwright": "^1.63.0" }
+}

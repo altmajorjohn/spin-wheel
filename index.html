@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spin Wheel Template</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+  #viewport { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  body.panel-open #viewport { right: 380px; }
+
+  #stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1080px; height: 1920px;
+    transform-origin: center center;
+    overflow: hidden;
+    background: #000;
+  }
+  #wheel { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; cursor: pointer; }
+
+  #rec {
+    position: fixed; top: 14px; left: 14px; z-index: 30; display: none;
+    background: #d11a2a; color: #fff; font: 600 13px -apple-system, sans-serif; padding: 7px 12px; border-radius: 20px;
+  }
+  body.recording #rec { display: block; }
+  body.clean #rec { display: none !important; }
+
+
+  /* Controls */
+  #gear {
+    position: fixed; top: 14px; right: 14px; z-index: 20;
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid #333;
+    background: #1a1a1a; color: #ddd; font-size: 20px; cursor: pointer;
+  }
+  body.panel-open #gear { right: 394px; }
+  body.clean #gear, body.clean #panel { display: none !important; }
+  body.clean #viewport { right: 0; }
+
+  #panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 380px; z-index: 10;
+    background: #121214; color: #e6e6e6; border-left: 1px solid #2a2a2e;
+    overflow-y: auto; padding: 16px 16px 60px; font-size: 13px; display: none;
+  }
+  body.panel-open #panel { display: block; }
+  #panel h2 { font-size: 15px; margin: 0 0 12px; }
+  #panel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #8a8a93; margin: 20px 0 8px; border-top: 1px solid #25252a; padding-top: 14px; }
+  #panel label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 7px 0; }
+  #panel label > span { flex: 0 0 auto; color: #bdbdc4; }
+  #panel input[type=text], #panel input[type=number], #panel select, #panel textarea {
+    background: #1d1d21; color: #eee; border: 1px solid #33333a; border-radius: 6px; padding: 6px 8px; font: inherit; min-width: 0;
+  }
+  #panel input[type=text], #panel select { flex: 1; }
+  #panel input[type=number] { width: 90px; }
+  #panel input[type=range] { flex: 1; }
+  #panel input[type=color] { width: 44px; height: 28px; padding: 0; border: 1px solid #33333a; border-radius: 6px; background: none; }
+  #panel textarea { width: 100%; font-family: ui-monospace, Menlo, monospace; font-size: 12px; resize: vertical; }
+  #panel .hint { color: #7c7c85; font-size: 11px; margin: 4px 0; line-height: 1.4; }
+  #panel .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  #panel button {
+    background: #2a2a30; color: #eee; border: 1px solid #3a3a42; border-radius: 6px; padding: 7px 10px; font: inherit; cursor: pointer;
+  }
+  #panel button.primary { background: #1a8cff; border-color: #1a8cff; color: #fff; }
+  #panel .val { width: 42px; text-align: right; color: #8a8a93; }
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <canvas id="wheel" width="1080" height="1920"></canvas>
+  </div>
+</div>
+<div id="rec">● Recording…</div>
+
+<button id="gear" title="Settings (E)">⚙</button>
+<div id="panel"></div>
+
+<script>
+/* =========================================================================
+   DEFAULT CONFIG — edit here, in the settings panel (E), or pass ?c=<share>
+   ========================================================================= */
+const DEFAULT_CONFIG = {
+  font: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif',
+  header: { show: true, icon: '🧬', label: 'Race', labelColor: '#1a8cff', pillColor: '#1c1c1e' },
+  title:  { show: true, initial: '', color: '#ffffff', size: 76 },
+  background: { type: 'solid', color: '#000000', color2: '#1b1040', angle: 180, image: '', overlay: 0 },
+  wheel: {
+    colorMode: 'gradient',                 // 'gradient' = blend across segments, 'cycle' = repeat list
+    colors: ['#f4fbff', '#9fd4f2', '#7fa0f0', '#1f5fff', '#0a3fc0', '#122a7a', '#1b1040'],
+    labelColor: '#ffffff', labelWeight: 500, labelMaxSize: 52,
+    rimColor: '#2a2a2c', hubColor: '#1f1f21', ringColor: '#56565a', separatorColor: '#000000', separatorOpacity: 0.18
+  },
+  // Clockwise from the top. "color" / "textColor" are optional per-segment overrides.
+  segments: [
+    { label: 'God', weight: 0.7, color: '#ffffff' },
+    { label: 'Demigod', weight: 1.6, color: '#8fd3f0' },
+    { label: 'Demon', weight: 2.6, color: '#6b1212' },
+    { label: 'Archangel', weight: 3 },
+    { label: 'Angel', weight: 3.4 },
+    { label: 'Cyborg', weight: 3.8 },
+    { label: 'Titan', weight: 3.8 },
+    { label: 'Lizard Person', weight: 4 },
+    { label: 'Giant', weight: 4 },
+    { label: 'Goblin', weight: 4 },
+    { label: 'Orc', weight: 4 },
+    { label: 'Dwarf', weight: 4 },
+    { label: 'Elf', weight: 4 },
+    { label: 'Skeleton', weight: 4 },
+    { label: 'Zombie', weight: 4 },
+    { label: 'Human', weight: 46 }
+  ],
+  spin: { duration: 9, rotations: 6, deceleration: 4, autoSpin: false, autoSpinDelay: 1 },
+  result: { mode: 'random', fixedLabel: 'God', dimLosers: true, dimAmount: 0.6, pop: true },
+  export: { fps: 30, holdStart: 1, holdEnd: 2.5, bitrate: 16, format: 'auto' }
+};
+
+const PRESETS = {
+  'Race (blue gradient)': DEFAULT_CONFIG,
+  'Rainbow palette': {
+    ...DEFAULT_CONFIG,
+    header: { ...DEFAULT_CONFIG.header, icon: '⚡', label: 'Type of God' },
+    wheel: { ...DEFAULT_CONFIG.wheel, colorMode: 'cycle',
+      colors: ['#e0483e', '#ee8a2a', '#d8a92a', '#6d6d72', '#8b5cf6', '#4f7fe0', '#3aa0a8', '#5aa84a', '#d9537a'] },
+    segments: ['Plagues','Pain','Decay','Nightmares','Despair','Betrayal','Wealth','Kings','Rulers','Charisma','Love',
+      'Friendship','Loyalty','Justice','Law','Freedom','Trade','Fame','Chance','Secrets','Lies','Truth','Mirrors','Gravity',
+      'Sound','Silence','Portals','Dimensions','Technology','Thunder','Lightning','Fire','Water','Ice','Wind','Earth',
+      'Time','Space','Reality','Fate','Prophecy','Death','Souls','Chaos','Evil','Suffering','Blood']
+      .map(n => ({ label: 'God of ' + n, weight: 1 }))
+  }
+};
+
+/* ========================================================================= */
+const $ = s => document.querySelector(s);
+const clone = o => JSON.parse(JSON.stringify(o));
+const W = 1080, H = 1920, CX = 540, CY = 1228, R = 505;
+const TAU = Math.PI * 2;
+
+function deepMerge(base, over) {
+  const out = clone(base);
+  for (const k in over || {}) {
+    if (over[k] && typeof over[k] === 'object' && !Array.isArray(over[k]) && typeof out[k] === 'object') out[k] = deepMerge(out[k], over[k]);
+    else out[k] = over[k];
+  }
+  return out;
+}
+
+function loadConfig() {
+  if (window.__WHEEL_CONFIG) return deepMerge(DEFAULT_CONFIG, window.__WHEEL_CONFIG);
+  if (window.__WHEEL_PRESET && PRESETS[window.__WHEEL_PRESET]) return clone(PRESETS[window.__WHEEL_PRESET]);
+  const p = new URLSearchParams(location.search);
+  if (p.get('c')) {
+    try { return deepMerge(DEFAULT_CONFIG, JSON.parse(decodeURIComponent(escape(atob(p.get('c')))))); } catch (e) { console.warn(e); }
+  }
+  try { const s = localStorage.getItem('spinWheelConfig'); if (s) return deepMerge(DEFAULT_CONFIG, JSON.parse(s)); } catch (e) {}
+  return clone(DEFAULT_CONFIG);
+}
+let cfg = loadConfig();
+function saveConfig() { try { localStorage.setItem('spinWheelConfig', JSON.stringify(cfg)); } catch (e) {} }
+
+/* ---------- colors ---------- */
+function hexToRgb(h) {
+  h = h.replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const rgbToHex = c => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+function gradientAt(stops, t) {
+  if (stops.length === 1) return stops[0];
+  const x = t * (stops.length - 1), i = Math.min(Math.floor(x), stops.length - 2), f = x - i;
+  const a = hexToRgb(stops[i]), b = hexToRgb(stops[i + 1]);
+  return rgbToHex(a.map((v, k) => v + (b[k] - v) * f));
+}
+
+/* ---------- wheel model ---------- */
+let segs = [];     // { label, color, textColor, start, end }
+function buildSegments() {
+  const list = cfg.segments.filter(s => s.label !== undefined && +s.weight > 0);
+  if (!list.length) list.push({ label: '—', weight: 1 });
+  const total = list.reduce((a, s) => a + +s.weight, 0);
+  const colors = (cfg.wheel.colors || []).filter(Boolean);
+  if (!colors.length) colors.push('#888888');
+  let acc = 0;
+  segs = list.map((s, i) => {
+    const span = (+s.weight / total) * TAU;
+    const auto = cfg.wheel.colorMode === 'cycle'
+      ? colors[i % colors.length]
+      : gradientAt(colors, list.length === 1 ? 0 : i / (list.length - 1));
+    const seg = { label: String(s.label), color: s.color || auto, textColor: s.textColor || cfg.wheel.labelColor, start: acc, end: acc + span, weight: +s.weight };
+    acc += span;
+    return seg;
+  });
+}
+
+/* ---------- state ---------- */
+let rotation = 0;           // radians, clockwise
+let spinning = false, spinAnim = null;
+let winnerIndex = -1, dimT = 0, popK = 0;
+let currentIndex = -1, titleText = '';
+let recording = false;
+let bgImg = null, iconImg = null;
+
+const canvas = $('#wheel'), ctx = canvas.getContext('2d');
+
+function indexAtPointer(rot) {
+  const a = ((-rot % TAU) + TAU) % TAU;
+  for (let i = 0; i < segs.length; i++) if (a >= segs[i].start && a < segs[i].end) return i;
+  return segs.length - 1;
+}
+
+/* ---------- drawing ---------- */
+function fitFont(text, maxSize, maxLen, maxHeight, weight) {
+  let size = Math.max(6, Math.min(maxSize, maxHeight));
+  ctx.font = `${weight} ${size}px ${cfg.font}`;
+  const w = ctx.measureText(text).width;
+  if (w > maxLen) size = Math.max(6, size * maxLen / w);
+  return size;
+}
+
+function drawBackground() {
+  const b = cfg.background;
+  ctx.fillStyle = b.color; ctx.fillRect(0, 0, W, H);
+  if (b.type === 'gradient') {
+    // Matches CSS linear-gradient(<angle>deg, ...): 0 = to top, 180 = to bottom
+    const a = (+b.angle || 0) * Math.PI / 180, dx = Math.sin(a), dy = -Math.cos(a);
+    const half = (Math.abs(W * dx) + Math.abs(H * dy)) / 2;
+    const g = ctx.createLinearGradient(W / 2 - dx * half, H / 2 - dy * half, W / 2 + dx * half, H / 2 + dy * half);
+    g.addColorStop(0, b.color); g.addColorStop(1, b.color2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  } else if (b.type === 'image' && bgImg && bgImg.complete && bgImg.naturalWidth) {
+    const s = Math.max(W / bgImg.naturalWidth, H / bgImg.naturalHeight);
+    const iw = bgImg.naturalWidth * s, ih = bgImg.naturalHeight * s;
+    ctx.drawImage(bgImg, (W - iw) / 2, (H - ih) / 2, iw, ih);
+    if (b.overlay > 0) { ctx.fillStyle = `rgba(0,0,0,${b.overlay})`; ctx.fillRect(0, 0, W, H); }
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawHeader() {
+  const h = cfg.header;
+  if (!h.show) return;
+  const top = 120, ph = 160, hasIcon = !!h.icon;
+  ctx.font = `500 58px ${cfg.font}`;
+  const pw = Math.max(250, ctx.measureText(h.label).width + 88);
+  ctx.save();
+  ctx.translate(CX, top + ph / 2); ctx.scale(1 + 0.1 * popK, 1 + 0.1 * popK); ctx.translate(-CX, -(top + ph / 2));
+  roundRect(CX - pw / 2, top, pw, ph, 34); ctx.fillStyle = h.pillColor; ctx.fill();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = h.labelColor;
+  ctx.fillText(h.label, CX, hasIcon ? top + 60 + (ph - 72) / 2 : top + (ph - 12) / 2);
+  if (hasIcon) {
+    if (iconImg && iconImg.complete && iconImg.naturalWidth) {
+      const ih = 110, iw = iconImg.naturalWidth * ih / iconImg.naturalHeight;
+      ctx.drawImage(iconImg, CX - iw / 2, top - 62, iw, ih);
+    } else if (!iconImg) {
+      ctx.font = `104px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", ${cfg.font}`;
+      ctx.fillText(h.icon, CX, top - 62 + 55);
+    }
+  }
+  ctx.restore();
+}
+
+function drawTitle() {
+  if (!cfg.title.show || !titleText) return;
+  let size = +cfg.title.size;
+  ctx.font = `600 ${size}px ${cfg.font}`;
+  const w = ctx.measureText(titleText).width;
+  if (w > W - 80) { size *= (W - 80) / w; ctx.font = `600 ${size}px ${cfg.font}`; }
+  const cy = (cfg.header.show ? 330 : 140) + cfg.title.size * 0.6;
+  ctx.save();
+  ctx.translate(CX, cy); ctx.scale(1 + 0.22 * popK, 1 + 0.22 * popK);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = cfg.title.color;
+  ctx.fillText(titleText, 0, 0);
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  const faceR = R * 0.955, hubR = R * 0.25;
+
+  // rim
+  ctx.beginPath(); ctx.arc(CX, CY, R, 0, TAU); ctx.fillStyle = cfg.wheel.rimColor; ctx.fill();
+
+  ctx.save();
+  ctx.translate(CX, CY);
+  ctx.rotate(rotation);
+
+  // segments
+  for (const s of segs) {
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.arc(0, 0, faceR, s.start - Math.PI / 2, s.end - Math.PI / 2);
+    ctx.closePath(); ctx.fillStyle = s.color; ctx.fill();
+  }
+  // separators
+  if (segs.length > 1 && cfg.wheel.separatorOpacity > 0) {
+    ctx.strokeStyle = cfg.wheel.separatorColor; ctx.globalAlpha = cfg.wheel.separatorOpacity; ctx.lineWidth = 2;
+    for (const s of segs) {
+      const a = s.start - Math.PI / 2;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * faceR, Math.sin(a) * faceR); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // labels: anchored near the rim, reading inward toward the hub
+  const pad = R * 0.07, maxLen = faceR - hubR - pad * 1.6;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  for (const s of segs) {
+    const span = s.end - s.start;
+    const chordAtHubEnd = span * (hubR + pad + maxLen * 0.35);
+    const size = fitFont(s.label, cfg.wheel.labelMaxSize, maxLen, Math.min(chordAtHubEnd * 0.8, span * faceR * 0.62), cfg.wheel.labelWeight);
+    if (size < 7) continue;
+    ctx.save();
+    ctx.rotate((s.start + s.end) / 2 - Math.PI / 2 + Math.PI);
+    ctx.font = `${cfg.wheel.labelWeight} ${size}px ${cfg.font}`;
+    ctx.fillStyle = s.textColor;
+    ctx.fillText(s.label, -(faceR - pad), 0);
+    ctx.restore();
+  }
+
+  // dim losers
+  if (winnerIndex >= 0 && dimT > 0 && cfg.result.dimLosers) {
+    ctx.fillStyle = `rgba(0,0,0,${cfg.result.dimAmount * dimT})`;
+    segs.forEach((s, i) => {
+      if (i === winnerIndex) return;
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.arc(0, 0, faceR + 0.5, s.start - Math.PI / 2, s.end - Math.PI / 2);
+      ctx.closePath(); ctx.fill();
+    });
+  }
+  ctx.restore();
+
+  // hub + pointer (static)
+  ctx.save(); ctx.translate(CX, CY);
+  const tipY = -R * 0.335, alpha = Math.acos(hubR / -tipY);
+  ctx.beginPath();
+  ctx.arc(0, 0, hubR, -Math.PI / 2 + alpha, -Math.PI / 2 - alpha + TAU);
+  ctx.lineTo(0, tipY); ctx.closePath();
+  ctx.fillStyle = cfg.wheel.hubColor; ctx.strokeStyle = cfg.wheel.hubColor;
+  ctx.lineJoin = 'round'; ctx.lineWidth = 10; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.118, 0, TAU);
+  ctx.lineWidth = R * 0.036; ctx.strokeStyle = cfg.wheel.ringColor; ctx.stroke();
+  ctx.restore();
+
+  // live title
+  const idx = indexAtPointer(rotation);
+  if (idx !== currentIndex) {
+    currentIndex = idx;
+    if (spinning || winnerIndex >= 0 || !cfg.title.initial) titleText = segs[idx].label;
+  }
+  drawHeader();
+  drawTitle();
+}
+
+/* ---------- spin ---------- */
+function pickWinner() {
+  if (cfg.result.mode === 'fixed') {
+    const i = segs.findIndex(s => s.label.trim().toLowerCase() === String(cfg.result.fixedLabel).trim().toLowerCase());
+    if (i >= 0) return i;
+  }
+  let r = Math.random() * segs.reduce((a, s) => a + s.weight, 0);
+  for (let i = 0; i < segs.length; i++) { r -= segs[i].weight; if (r <= 0) return i; }
+  return segs.length - 1;
+}
+
+function spin() {
+  if (spinning) return;
+  spinning = true; winnerIndex = -1; dimT = 0;
+  const win = pickWinner(), s = segs[win];
+  const target = s.start + (s.end - s.start) * (0.15 + Math.random() * 0.7);   // local angle under pointer
+  const start = rotation;
+  const base = (((-target - start) % TAU) + TAU) % TAU;
+  const end = start + base + Math.max(0, Math.round(cfg.spin.rotations)) * TAU;
+  const dur = Math.max(0.2, +cfg.spin.duration) * 1000, p = Math.max(1, +cfg.spin.deceleration);
+  const t0 = performance.now();
+
+  cancelAnimationFrame(spinAnim);
+  const step = now => {
+    const t = Math.min(1, (now - t0) / dur);
+    rotation = start + (end - start) * (1 - Math.pow(1 - t, p));
+    draw();
+    if (t < 1) spinAnim = requestAnimationFrame(step);
+    else finish(win);
+  };
+  spinAnim = requestAnimationFrame(step);
+}
+
+function finish(win) {
+  spinning = false; winnerIndex = win;
+  rotation = ((rotation % TAU) + TAU) % TAU;
+  titleText = segs[win].label;
+  const t0 = performance.now();
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const tick = now => {
+    const e = now - t0, p = Math.min(1, e / 500);
+    dimT = Math.min(1, e / 450);
+    popK = cfg.result.pop ? (p < 0.4 ? easeOut(p / 0.4) : 1 - easeOut((p - 0.4) / 0.6)) : 0;
+    draw();
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function resetWheel() {
+  cancelAnimationFrame(spinAnim); spinning = false; winnerIndex = -1; dimT = 0; popK = 0; rotation = 0; currentIndex = -1;
+  titleText = cfg.title.initial || '';
+  draw();
+}
+
+/* ---------- apply config ---------- */
+function loadImage(src, prev) {
+  if (!src) return null;
+  if (prev && prev.dataset.src === src) return prev;
+  const img = new Image();
+  img.dataset.src = src;
+  img.onload = () => draw();
+  img.src = src;
+  return img;
+}
+
+function applyConfig() {
+  buildSegments();
+  const b = cfg.background, icon = cfg.header.icon || '';
+  bgImg = b.type === 'image' ? loadImage(b.image, bgImg) : null;
+  iconImg = /^(https?:|data:|\.{0,2}\/)/.test(icon) ? loadImage(icon, iconImg) : null;
+
+  if (winnerIndex >= segs.length) winnerIndex = -1;
+  currentIndex = -1;
+  if (!spinning && winnerIndex < 0) titleText = cfg.title.initial || segs[indexAtPointer(rotation)].label;
+  draw();
+  saveConfig();
+}
+
+/* ---------- video export (records the canvas in real time) ---------- */
+const sleep = s => new Promise(r => setTimeout(r, s * 1000));
+function pickMime() {
+  const mp4 = ['video/mp4;codecs=avc1.640033', 'video/mp4;codecs=avc1', 'video/mp4'];
+  const webm = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const order = cfg.export.format === 'webm' ? [...webm, ...mp4] : [...mp4, ...webm];
+  return order.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+}
+
+async function recordVideo() {
+  if (recording || spinning) return;
+  const mime = pickMime();
+  if (!mime) { alert('This browser cannot record video. Use Chrome, Edge or Safari, or run: node render.mjs'); return; }
+  const e = cfg.export;
+  recording = true; document.body.classList.add('recording');
+  resetWheel();
+  const stream = canvas.captureStream(+e.fps || 30);
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: (+e.bitrate || 16) * 1e6 });
+  const chunks = [];
+  rec.ondataavailable = ev => ev.data.size && chunks.push(ev.data);
+  const stopped = new Promise(r => (rec.onstop = r));
+  const keepAlive = () => { if (!recording) return; draw(); requestAnimationFrame(keepAlive); };
+  rec.start(250); keepAlive();
+
+  await sleep(+e.holdStart || 0);
+  spin();
+  while (spinning) await sleep(0.05);
+  await sleep(Math.max(0.6, +e.holdEnd || 0));
+  rec.stop(); await stopped;
+  stream.getTracks().forEach(t => t.stop());
+  recording = false; document.body.classList.remove('recording');
+
+  const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
+  const name = `wheel-${(segs[winnerIndex]?.label || 'spin').replace(/[^\w-]+/g, '-').toLowerCase()}.${ext}`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(chunks, { type: mime.split(';')[0] }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+/* ---------- layout ---------- */
+function fit() {
+  const vp = $('#viewport').getBoundingClientRect();
+  const s = Math.min(vp.width / W, vp.height / H);
+  $('#stage').style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+window.addEventListener('resize', fit);
+
+/* ---------- settings panel ---------- */
+const get = path => path.split('.').reduce((o, k) => o[k], cfg);
+const set = (path, v) => { const ks = path.split('.'), last = ks.pop(); ks.reduce((o, k) => o[k], cfg)[last] = v; };
+
+function segmentsToText() {
+  return cfg.segments.map(s => [s.label, s.weight, s.color || '', s.textColor || ''].join(' | ').replace(/( \| )+$/, '')).join('\n');
+}
+function textToSegments(txt) {
+  return txt.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const [label, weight, color, textColor] = l.split('|').map(x => x.trim());
+    const s = { label, weight: weight === undefined || weight === '' ? 1 : parseFloat(weight) || 0 };
+    if (color) s.color = color;
+    if (textColor) s.textColor = textColor;
+    return s;
+  });
+}
+
+function buildPanel() {
+  const P = $('#panel');
+  P.innerHTML = '';
+  const add = html => { const d = document.createElement('div'); d.innerHTML = html; while (d.firstChild) P.appendChild(d.firstChild); return P.lastChild; };
+  const sec = t => add(`<h3>${t}</h3>`);
+
+  const field = (label, path, type, opts = {}) => {
+    const v = get(path);
+    let input;
+    if (type === 'select') input = `<select>${opts.options.map(o => `<option value="${o[0]}" ${o[0] == v ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`;
+    else if (type === 'checkbox') input = `<input type="checkbox" ${v ? 'checked' : ''}>`;
+    else if (type === 'range') input = `<input type="range" min="${opts.min}" max="${opts.max}" step="${opts.step}" value="${v}"><span class="val">${v}</span>`;
+    else input = `<input type="${type}" value="${String(v).replace(/"/g, '&quot;')}" ${opts.step ? `step="${opts.step}"` : ''}>`;
+    const el = add(`<label><span>${label}</span>${input}</label>`);
+    const inp = el.querySelector('input,select');
+    inp.addEventListener('input', () => {
+      let val = type === 'checkbox' ? inp.checked : inp.value;
+      if (type === 'number' || type === 'range') val = parseFloat(val) || 0;
+      if (type === 'range') el.querySelector('.val').textContent = val;
+      set(path, val); applyConfig();
+      if (opts.rebuild) buildPanel();
+    });
+  };
+
+  add(`<h2>Spin Wheel Template</h2>
+    <div class="hint"><b>Space</b>/click wheel = spin · <b>V</b> = record video · <b>R</b> = reset · <b>E</b> = settings · <b>H</b> = clean mode (press H again to exit)</div>`);
+  const r = add(`<div class="row"><button class="primary" id="bSpin">Spin</button><button class="primary" id="bRec">⏺ Export video</button><button id="bReset">Reset</button><button id="bClean">Clean mode</button></div>`);
+  r.querySelector('#bSpin').onclick = () => { if (!recording) spin(); };
+  r.querySelector('#bRec').onclick = recordVideo;
+  r.querySelector('#bReset').onclick = () => { if (!recording) resetWheel(); };
+  r.querySelector('#bClean').onclick = () => document.body.classList.add('clean');
+
+  sec('Preset');
+  const pr = add(`<label><span>Load</span><select><option value="">— choose —</option>${Object.keys(PRESETS).map(k => `<option>${k}</option>`).join('')}</select></label>`);
+  pr.querySelector('select').onchange = e => { if (!e.target.value) return; cfg = clone(PRESETS[e.target.value]); resetWheel(); applyConfig(); buildPanel(); };
+
+  sec('Segments (text & weights)');
+  add(`<div class="hint">One per line, clockwise from the top:<br><code>Label | weight | #color | #textColor</code><br>Weight sets slice size & odds. Color and textColor are optional overrides.</div>`);
+  const ta = add(`<textarea rows="12"></textarea>`);
+  ta.value = segmentsToText();
+  ta.addEventListener('input', () => { cfg.segments = textToSegments(ta.value); applyConfig(); });
+
+  sec('Colors');
+  field('Mode', 'wheel.colorMode', 'select', { options: [['gradient', 'Gradient (blend)'], ['cycle', 'Palette (repeat)']] });
+  add(`<div class="hint">Color list — first = top segment. Used as gradient stops or a repeating palette.</div>`);
+  const colWrap = add(`<div class="row" id="colorList"></div>`);
+  const renderColors = () => {
+    colWrap.innerHTML = '';
+    cfg.wheel.colors.forEach((c, i) => {
+      const inp = document.createElement('input'); inp.type = 'color'; inp.value = c; inp.title = 'Right-click to remove';
+      inp.oninput = () => { cfg.wheel.colors[i] = inp.value; applyConfig(); };
+      inp.oncontextmenu = e => { e.preventDefault(); if (cfg.wheel.colors.length > 1) { cfg.wheel.colors.splice(i, 1); renderColors(); applyConfig(); } };
+      colWrap.appendChild(inp);
+    });
+    const plus = document.createElement('button'); plus.textContent = '+';
+    plus.onclick = () => { cfg.wheel.colors.push(cfg.wheel.colors.at(-1) || '#888888'); renderColors(); applyConfig(); };
+    const rev = document.createElement('button'); rev.textContent = '⇄'; rev.title = 'Reverse';
+    rev.onclick = () => { cfg.wheel.colors.reverse(); renderColors(); applyConfig(); };
+    colWrap.append(plus, rev);
+  };
+  renderColors();
+  const clr = add(`<div class="row"><button>Clear per-segment color overrides</button></div>`);
+  clr.querySelector('button').onclick = () => { cfg.segments.forEach(s => { delete s.color; }); ta.value = segmentsToText(); applyConfig(); };
+  field('Rim', 'wheel.rimColor', 'color');
+  field('Hub & pointer', 'wheel.hubColor', 'color');
+  field('Hub ring', 'wheel.ringColor', 'color');
+  field('Separator lines', 'wheel.separatorColor', 'color');
+  field('Separator opacity', 'wheel.separatorOpacity', 'range', { min: 0, max: 1, step: 0.01 });
+
+  sec('Speed');
+  field('Duration (s)', 'spin.duration', 'range', { min: 1, max: 30, step: 0.5 });
+  field('Full rotations', 'spin.rotations', 'range', { min: 1, max: 40, step: 1 });
+  field('Deceleration', 'spin.deceleration', 'range', { min: 1, max: 8, step: 0.1 });
+  add(`<div class="hint">Higher deceleration = fast start, long slow crawl at the end.</div>`);
+  field('Auto-spin on load', 'spin.autoSpin', 'checkbox');
+  field('Auto-spin delay (s)', 'spin.autoSpinDelay', 'number', { step: 0.1 });
+
+  sec('Result');
+  field('Winner', 'result.mode', 'select', { options: [['random', 'Random (weighted)'], ['fixed', 'Fixed segment']], rebuild: true });
+  if (cfg.result.mode === 'fixed') field('Land on', 'result.fixedLabel', 'select', { options: segs.map(s => [s.label, s.label]) });
+  field('Dim other segments', 'result.dimLosers', 'checkbox');
+  field('Dim amount', 'result.dimAmount', 'range', { min: 0, max: 1, step: 0.05 });
+  field('Pop animation', 'result.pop', 'checkbox');
+
+  sec('Background');
+  field('Type', 'background.type', 'select', { options: [['solid', 'Solid'], ['gradient', 'Gradient'], ['image', 'Image']], rebuild: true });
+  field('Color', 'background.color', 'color');
+  if (cfg.background.type === 'gradient') { field('Color 2', 'background.color2', 'color'); field('Angle', 'background.angle', 'range', { min: 0, max: 360, step: 1 }); }
+  if (cfg.background.type === 'image') {
+    field('Image URL', 'background.image', 'text');
+    const up = add(`<label><span>Upload</span><input type="file" accept="image/*"></label>`);
+    up.querySelector('input').onchange = e => {
+      const f = e.target.files[0]; if (!f) return;
+      const rd = new FileReader(); rd.onload = () => { cfg.background.image = rd.result; applyConfig(); buildPanel(); }; rd.readAsDataURL(f);
+    };
+    field('Darken', 'background.overlay', 'range', { min: 0, max: 1, step: 0.05 });
+  }
+
+  sec('Text');
+  field('Font family', 'font', 'text');
+  field('Show category pill', 'header.show', 'checkbox');
+  field('Pill icon (emoji/URL)', 'header.icon', 'text');
+  field('Pill label', 'header.label', 'text');
+  field('Pill label color', 'header.labelColor', 'color');
+  field('Pill background', 'header.pillColor', 'color');
+  field('Show title', 'title.show', 'checkbox');
+  field('Title before spin', 'title.initial', 'text');
+  field('Title color', 'title.color', 'color');
+  field('Title size', 'title.size', 'range', { min: 30, max: 140, step: 1 });
+  field('Label color', 'wheel.labelColor', 'color');
+  field('Label max size', 'wheel.labelMaxSize', 'range', { min: 16, max: 110, step: 1 });
+  field('Label weight', 'wheel.labelWeight', 'select', { options: [[300, 'Light'], [400, 'Regular'], [500, 'Medium'], [600, 'Semibold'], [700, 'Bold'], [800, 'Heavy']] });
+
+  sec('Video export');
+  add(`<div class="hint">Records one spin to a 1080×1920 video file in real time. Keep this tab visible while it records. Only the wheel canvas gets captured, never these controls.</div>`);
+  field('Format', 'export.format', 'select', { options: [['auto', 'MP4 (fallback WebM)'], ['webm', 'WebM']] });
+  field('Frame rate', 'export.fps', 'select', { options: [[30, '30 fps'], [60, '60 fps']] });
+  field('Hold before spin (s)', 'export.holdStart', 'number', { step: 0.1 });
+  field('Hold after result (s)', 'export.holdEnd', 'number', { step: 0.1 });
+  field('Bitrate (Mbps)', 'export.bitrate', 'range', { min: 4, max: 40, step: 1 });
+
+  sec('Save / share');
+  const io = add(`<div class="row"><button id="bCopy">Copy share link</button><button id="bExport">Export JSON</button><button id="bImport">Import JSON</button><button id="bDefault">Restore defaults</button></div>`);
+  io.querySelector('#bCopy').onclick = async () => {
+    const c = btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
+    const url = location.origin + location.pathname + '?c=' + c;
+    try { await navigator.clipboard.writeText(url); alert('Link copied. Add &clean=1 to hide controls.'); } catch { prompt('Copy this link:', url); }
+  };
+  io.querySelector('#bExport').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' }));
+    a.download = 'wheel-config.json'; a.click();
+  };
+  io.querySelector('#bImport').onclick = () => {
+    const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json';
+    f.onchange = () => f.files[0].text().then(t => { try { cfg = deepMerge(DEFAULT_CONFIG, JSON.parse(t)); resetWheel(); applyConfig(); buildPanel(); } catch (e) { alert('Invalid JSON'); } });
+    f.click();
+  };
+  io.querySelector('#bDefault').onclick = () => { cfg = clone(DEFAULT_CONFIG); resetWheel(); applyConfig(); buildPanel(); };
+}
+
+function togglePanel() { document.body.classList.toggle('panel-open'); fit(); }
+
+/* ---------- events ---------- */
+canvas.addEventListener('click', e => {
+  const rc = canvas.getBoundingClientRect(), k = W / rc.width;
+  const x = (e.clientX - rc.left) * k - CX, y = (e.clientY - rc.top) * k - CY;
+  if (!recording && x * x + y * y <= R * R) spin();
+});
+$('#gear').onclick = togglePanel;
+window.addEventListener('keydown', e => {
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (e.code === 'Space') { e.preventDefault(); if (!recording) spin(); }
+  else if (e.key === 'v' || e.key === 'V') recordVideo();
+  else if ((e.key === 'r' || e.key === 'R') && !recording) resetWheel();
+  else if (e.key === 'e' || e.key === 'E') togglePanel();
+  else if (e.key === 'h' || e.key === 'H') { document.body.classList.toggle('clean'); fit(); }
+});
+
+/* ---------- boot ---------- */
+const params = new URLSearchParams(location.search);
+if (params.get('clean') === '1' || params.get('render') === '1') document.body.classList.add('clean');
+applyConfig();
+resetWheel();
+buildPanel();
+fit();
+if (document.fonts) document.fonts.ready.then(draw);
+if (params.get('render') !== '1' && (cfg.spin.autoSpin || params.get('autospin') === '1')) setTimeout(spin, (+cfg.spin.autoSpinDelay || 0) * 1000);
+</script>
+</body>
+</html>
