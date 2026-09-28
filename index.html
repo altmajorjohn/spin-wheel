@@ -3,151 +3,529 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Spin Wheel Template</title>
+<title>Spin Wheel Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap" />
 <style>
+  :root {
+    --bg: #f2f1ed; --panel: #ffffff; --panel-2: #f7f6f3; --line: #e5e3dd; --line-strong: #d2cfc7;
+    --text: #1c1b19; --muted: #67645c; --accent: #3355ff; --accent-hover: #2445ee; --accent-soft: #e6eaff;
+    --danger: #c3302a; --danger-soft: #fbeceb;
+    --ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 14px/1.45 var(--ui); color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+  ::selection { background: var(--accent-soft); color: var(--text); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+  svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  #viewport { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-  body.panel-open #viewport { right: 380px; }
+  /* ---------- layout ---------- */
+  .app { display: grid; grid-template-columns: minmax(380px, 460px) 1fr; grid-template-rows: auto minmax(0, 1fr); height: 100dvh; }
+  .topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; letter-spacing: -0.01em; margin-right: auto; }
+  .brand-mark { width: 22px; height: 22px; border-radius: 50%; background: conic-gradient(#f4fbff 0 14%, #9fd4f2 0 28%, #7fa0f0 0 42%, #1f5fff 0 57%, #0a3fc0 0 71%, #122a7a 0 85%, #1b1040 0); box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); }
+  .saved-note { color: var(--muted); font-size: 12.5px; margin-right: 8px; }
 
-  #stage {
-    position: absolute; left: 50%; top: 50%;
-    width: 1080px; height: 1920px;
-    transform-origin: center center;
-    overflow: hidden;
-    background: #000;
-  }
-  #wheel { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; cursor: pointer; }
+  .editor { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); border-right: 1px solid var(--line); transition: opacity .2s; }
+  .editor[inert] { opacity: .5; }
+  .templates { padding: 14px 16px 12px; border-bottom: 1px solid var(--line); }
+  .templates-title { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 0 0 8px; }
+  .template-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; margin: -2px -2px 0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+  .template { flex: none; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); cursor: pointer; white-space: nowrap; font-weight: 550; transition: background .15s, border-color .15s; }
+  .template:hover { background: var(--panel-2); border-color: var(--line-strong); }
+  .mini-wheel { width: 26px; height: 26px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); }
 
-  #rec {
-    position: fixed; top: 14px; left: 14px; z-index: 30; display: none;
-    background: #d11a2a; color: #fff; font: 600 13px -apple-system, sans-serif; padding: 7px 12px; border-radius: 20px;
-  }
-  body.recording #rec { display: block; }
-  body.clean #rec { display: none !important; }
+  .tabs { display: flex; padding: 0 8px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .tab { flex: 1; padding: 12px 2px 11px; border: 0; background: none; color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s, border-color .15s; }
+  .tab:hover { color: var(--text); }
+  .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  .panels { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+  .panel { padding: 18px 16px 48px; }
 
+  .group + .group { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 20px; }
+  .group h3 { font-size: 15.5px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.005em; }
+  .help { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; max-width: 60ch; }
+  .help.after { margin: 8px 0 0; }
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; }
+  .field + .field, .field + .row, .row + .field { margin-top: 8px; }
+  .field > .lbl { flex: none; }
+  .field.stack { flex-direction: column; align-items: stretch; gap: 6px; }
+  .field.stack .input { flex: none; max-width: none; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .group > .row { margin-top: 12px; }
 
-  /* Controls */
-  #gear {
-    position: fixed; top: 14px; right: 14px; z-index: 20;
-    width: 40px; height: 40px; border-radius: 50%; border: 1px solid #333;
-    background: #1a1a1a; color: #ddd; font-size: 20px; cursor: pointer;
-  }
-  body.panel-open #gear { right: 394px; }
-  body.clean #gear, body.clean #panel { display: none !important; }
-  body.clean #viewport { right: 0; }
+  /* ---------- controls ---------- */
+  .input { height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); min-width: 0; transition: border-color .15s, box-shadow .15s; }
+  .input:hover { border-color: #bbb7ad; }
+  .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .input::placeholder { color: #767268; }
+  .field .input { flex: 1; max-width: 240px; }
+  textarea.input { height: auto; padding: 8px 10px; resize: vertical; line-height: 1.5; }
+  select.input { appearance: none; padding-right: 30px; cursor: pointer; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2367645c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; }
+  input[type="number"].input { font-variant-numeric: tabular-nums; }
 
-  #panel {
-    position: fixed; top: 0; right: 0; bottom: 0; width: 380px; z-index: 10;
-    background: #121214; color: #e6e6e6; border-left: 1px solid #2a2a2e;
-    overflow-y: auto; padding: 16px 16px 60px; font-size: 13px; display: none;
+  .swatch { position: relative; display: block; width: 38px; height: 38px; border-radius: 8px; background: var(--c, #ccc); box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); cursor: pointer; flex: none; }
+  .swatch input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+  .swatch:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
+  .seg button { border: 0; background: none; padding: 6px 12px; border-radius: 7px; color: var(--muted); font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 1px 1px rgba(0,0,0,.04); }
+  .seg.full { display: flex; } .seg.full button { flex: 1; }
+
+  .switch { position: relative; width: 42px; height: 24px; flex: none; }
+  .switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+  .switch span { position: absolute; inset: 0; border-radius: 999px; background: #cdcac1; transition: background .18s; }
+  .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s cubic-bezier(.2,.8,.2,1); }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(18px); }
+  .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .range { display: flex; align-items: center; gap: 10px; flex: 1; max-width: 250px; }
+  .range input { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
+  .range output { min-width: 58px; text-align: right; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--panel); font-weight: 600; font-size: 13.5px; cursor: pointer; white-space: nowrap; text-decoration: none; transition: background .15s, border-color .15s, color .15s; }
+  .btn:hover { background: var(--panel-2); border-color: #bbb7ad; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn.ghost { border-color: transparent; background: none; color: var(--muted); }
+  .btn.ghost:hover { background: var(--panel-2); color: var(--text); }
+  .btn.lg { height: 50px; padding: 0 24px; font-size: 15px; border-radius: 12px; }
+  .icon-btn { width: 34px; height: 34px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); display: inline-grid; place-items: center; cursor: pointer; flex: none; transition: background .15s, color .15s; }
+  .icon-btn:hover { background: var(--panel-2); color: var(--text); }
+  .icon-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+  .icon-btn:disabled { opacity: .35; cursor: not-allowed; background: none; color: var(--muted); }
+
+  details.more { margin-top: 12px; }
+  details.more summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 6px; }
+  details.more summary::-webkit-details-marker { display: none; }
+  details.more summary svg { width: 14px; height: 14px; transition: transform .2s; }
+  details.more[open] summary svg { transform: rotate(90deg); }
+  details.more > div { padding-top: 8px; }
+
+  /* ---------- slices ---------- */
+  .slice-grid { display: grid; grid-template-columns: 22px 38px minmax(0, 1fr) 64px 42px 34px; gap: 6px; align-items: center; }
+  .slice-head { font-size: 12px; font-weight: 600; color: var(--muted); padding-bottom: 6px; }
+  .slice-head .r { text-align: right; }
+  .slice { padding: 3px 0; border-radius: 8px; position: relative; }
+  .slice.zero .swatch, .slice.zero .pct { opacity: .45; }
+  .slice.dragging { opacity: .35; }
+  .slice.drop-before::before, .slice.drop-after::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); border-radius: 2px; }
+  .slice.drop-before::before { top: -1px; } .slice.drop-after::after { bottom: -1px; }
+  .grip { width: 22px; height: 34px; padding: 0; border: 0; border-radius: 6px; background: none; color: #a29e94; display: grid; place-items: center; cursor: grab; }
+  .grip:hover { color: var(--text); background: var(--panel-2); }
+  .grip svg { width: 16px; height: 16px; }
+  .swatch-wrap { position: relative; }
+  .swatch-reset { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid var(--panel); background: var(--text); color: #fff; display: grid; place-items: center; cursor: pointer; z-index: 1; }
+  .swatch-reset svg { width: 11px; height: 11px; stroke-width: 2.6; }
+  .slice .input.num { padding: 0 8px; text-align: right; }
+  .pct { font-size: 12.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .paste { margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--panel-2); }
+  .paste label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .paste textarea { width: 100%; }
+  .paste .row { margin-top: 10px; }
+
+  /* ---------- colors ---------- */
+  .theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .theme { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--muted); transition: border-color .15s, background .15s, color .15s; }
+  .theme:hover { background: var(--panel-2); color: var(--text); }
+  .theme[aria-pressed="true"] { border-color: var(--accent); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+  .theme .mini-wheel { width: 40px; height: 40px; }
+  .color-list { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .color-item { position: relative; }
+  .color-item .remove { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid var(--panel); background: var(--text); color: #fff; display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .15s; z-index: 1; }
+  .color-item .remove svg { width: 10px; height: 10px; stroke-width: 3; }
+  .color-item:hover .remove, .color-item:focus-within .remove { opacity: 1; }
+  @media (hover: none) { .color-item .remove { opacity: 1; } }
+  .add-color { width: 38px; height: 38px; border-radius: 8px; border: 1.5px dashed var(--line-strong); background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+  .add-color:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- background / badge ---------- */
+  .drop { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px; border: 1.5px dashed var(--line-strong); border-radius: 12px; background: var(--panel-2); cursor: pointer; text-align: left; transition: border-color .15s, background .15s; }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .drop .thumb { width: 44px; height: 78px; border-radius: 6px; background: #ddd center / cover no-repeat; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); display: grid; place-items: center; color: var(--muted); }
+  .drop strong { display: block; font-weight: 600; }
+  .drop span.sub { color: var(--muted); font-size: 12.5px; }
+  .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .emoji { height: 40px; border: 1px solid transparent; border-radius: 8px; background: none; font-size: 22px; line-height: 1; cursor: pointer; display: grid; place-items: center; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+  .emoji:hover { background: var(--panel-2); }
+  .emoji[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .emoji svg { width: 18px; height: 18px; color: var(--muted); }
+  .emoji img { width: 26px; height: 26px; object-fit: contain; }
+
+  /* ---------- preview ---------- */
+  .preview { display: flex; flex-direction: column; align-items: center; min-height: 0; min-width: 0; padding: 24px 24px 20px; gap: 16px; }
+  .stage { flex: 1; min-height: 0; width: 100%; display: grid; place-items: center; }
+  #wheel { display: block; border-radius: 18px; cursor: pointer; box-shadow: 0 28px 56px -28px rgba(24, 20, 10, .5), 0 6px 18px -10px rgba(24, 20, 10, .3); }
+  .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  #downloadBtn { position: relative; overflow: hidden; min-width: 210px; }
+  #downloadBtn.recording { background: #7d90ff; border-color: #7d90ff; cursor: progress; opacity: 1; }
+  #downloadBtn.recording::before { content: ""; position: absolute; inset: 0; background: var(--accent); transform: scaleX(var(--p, 0)); transform-origin: left; transition: transform .2s linear; }
+  #downloadBtn > * { position: relative; }
+  .status { color: var(--muted); font-size: 13px; text-align: center; min-height: 20px; margin: 0; }
+  .status b { color: var(--text); font-weight: 650; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; z-index: 50; display: flex; align-items: center; gap: 14px; max-width: calc(100vw - 32px); padding: 11px 16px; border-radius: 12px; background: #1c1b19; color: #fff; font-size: 13.5px; box-shadow: 0 16px 36px -12px rgba(0,0,0,.45); opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.2,.8,.2,1); }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast button { border: 0; background: none; color: #a9b6ff; font-weight: 650; cursor: pointer; padding: 0; }
+
+  /* clean / render mode: wheel only */
+  body.clean .topbar, body.clean .editor, body.clean .actions, body.clean .status { display: none !important; }
+  body.clean .app { grid-template-columns: 1fr; grid-template-rows: 1fr; background: #000; }
+  body.clean .preview { padding: 0; }
+  body.clean #wheel { border-radius: 0; box-shadow: none; }
+
+  @media (max-width: 880px) {
+    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; height: auto; min-height: 100dvh; }
+    .preview { grid-row: 2; height: 72dvh; padding: 16px 12px 14px; }
+    .editor { grid-row: 3; border-right: 0; border-top: 1px solid var(--line); }
+    .tabs { position: sticky; top: 0; z-index: 2; overflow-x: auto; scrollbar-width: none; }
+    .tab { flex: none; padding-inline: 12px; }
+    .panels { overflow: visible; }
+    .topbar .btn .label, .saved-note { display: none; }
+    .topbar .btn { width: 38px; padding: 0; }
   }
-  body.panel-open #panel { display: block; }
-  #panel h2 { font-size: 15px; margin: 0 0 12px; }
-  #panel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #8a8a93; margin: 20px 0 8px; border-top: 1px solid #25252a; padding-top: 14px; }
-  #panel label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 7px 0; }
-  #panel label > span { flex: 0 0 auto; color: #bdbdc4; }
-  #panel input[type=text], #panel input[type=number], #panel select, #panel textarea {
-    background: #1d1d21; color: #eee; border: 1px solid #33333a; border-radius: 6px; padding: 6px 8px; font: inherit; min-width: 0;
-  }
-  #panel input[type=text], #panel select { flex: 1; }
-  #panel input[type=number] { width: 90px; }
-  #panel input[type=range] { flex: 1; }
-  #panel input[type=color] { width: 44px; height: 28px; padding: 0; border: 1px solid #33333a; border-radius: 6px; background: none; }
-  #panel textarea { width: 100%; font-family: ui-monospace, Menlo, monospace; font-size: 12px; resize: vertical; }
-  #panel .hint { color: #7c7c85; font-size: 11px; margin: 4px 0; line-height: 1.4; }
-  #panel .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-  #panel button {
-    background: #2a2a30; color: #eee; border: 1px solid #3a3a42; border-radius: 6px; padding: 7px 10px; font: inherit; cursor: pointer;
-  }
-  #panel button.primary { background: #1a8cff; border-color: #1a8cff; color: #fff; }
-  #panel .val { width: 42px; text-align: right; color: #8a8a93; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
-<div id="viewport">
-  <div id="stage">
-    <canvas id="wheel" width="1080" height="1920"></canvas>
-  </div>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Spin Wheel Maker</div>
+    <span class="saved-note">Changes save automatically in this browser</span>
+    <button class="btn ghost" id="shareBtn" title="Copy a link to this wheel"><svg class="i"><use href="#i-link"/></svg><span class="label">Share link</span></button>
+    <button class="btn ghost" id="saveBtn" title="Download these settings as a file"><svg class="i"><use href="#i-save"/></svg><span class="label">Save</span></button>
+    <button class="btn ghost" id="openBtn" title="Open a settings file"><svg class="i"><use href="#i-folder"/></svg><span class="label">Open</span></button>
+    <input type="file" id="openFile" accept=".json,application/json" hidden />
+  </header>
+
+  <aside class="editor" id="editor" aria-label="Wheel settings">
+    <div class="templates">
+      <p class="templates-title">Start from a template</p>
+      <div class="template-row" id="templateRow"></div>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Settings sections">
+      <button class="tab" role="tab" id="t-slices" aria-controls="p-slices" aria-selected="true">Slices</button>
+      <button class="tab" role="tab" id="t-colors" aria-controls="p-colors" aria-selected="false" tabindex="-1">Colors</button>
+      <button class="tab" role="tab" id="t-bg" aria-controls="p-bg" aria-selected="false" tabindex="-1">Background</button>
+      <button class="tab" role="tab" id="t-text" aria-controls="p-text" aria-selected="false" tabindex="-1">Text</button>
+      <button class="tab" role="tab" id="t-spin" aria-controls="p-spin" aria-selected="false" tabindex="-1">Spin &amp; video</button>
+    </div>
+
+    <div class="panels">
+      <!-- SLICES -->
+      <section class="panel" id="p-slices" role="tabpanel" aria-labelledby="t-slices">
+        <div class="group">
+          <h3>What's on the wheel</h3>
+          <p class="help">The first slice sits under the pointer and the rest go clockwise. Give a slice a higher chance to make it bigger and more likely to win. Drag <svg class="i" style="width:13px;height:13px;vertical-align:-2px"><use href="#i-grip"/></svg> to reorder.</p>
+          <div class="slice-grid slice-head" aria-hidden="true"><span></span><span>Color</span><span>Text</span><span class="r">Chance</span><span class="r">Odds</span><span></span></div>
+          <div id="sliceList"></div>
+          <div class="row">
+            <button class="btn" id="addSlice"><svg class="i"><use href="#i-plus"/></svg>Add slice</button>
+            <button class="btn ghost" id="pasteToggle" aria-expanded="false" aria-controls="pasteBox"><svg class="i"><use href="#i-list"/></svg>Paste a list</button>
+            <button class="btn ghost" id="equalize"><svg class="i"><use href="#i-equal"/></svg>Make all equal</button>
+          </div>
+          <div class="paste" id="pasteBox" hidden>
+            <label for="pasteText">Paste names, one per line</label>
+            <textarea class="input" id="pasteText" rows="7" placeholder="Pizza&#10;Sushi&#10;Tacos"></textarea>
+            <p class="help after">Copying two columns from a spreadsheet works too: the second column becomes the chance.</p>
+            <div class="row">
+              <button class="btn primary" id="pasteReplace">Replace all slices</button>
+              <button class="btn" id="pasteAdd">Add to the end</button>
+              <button class="btn ghost" id="pasteCancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- COLORS -->
+      <section class="panel" id="p-colors" role="tabpanel" aria-labelledby="t-colors" hidden>
+        <div class="group">
+          <h3>Color theme</h3>
+          <p class="help">Pick a starting point, then fine-tune the colors below.</p>
+          <div class="theme-grid" id="themeGrid"></div>
+        </div>
+        <div class="group">
+          <h3>Wheel colors</h3>
+          <p class="help">Click a color to change it. The first color starts at the top of the wheel.</p>
+          <div class="color-list" id="colorList"></div>
+          <div class="field" style="margin-top:14px">
+            <span class="lbl">Use the colors</span>
+            <div class="seg" data-seg="wheel.colorMode"><button data-value="gradient">Blended</button><button data-value="cycle">Repeating</button></div>
+          </div>
+          <div class="row" id="overrideRow">
+            <button class="btn ghost" id="clearOverrides"><svg class="i"><use href="#i-undo"/></svg>Undo custom slice colors</button>
+          </div>
+        </div>
+        <div class="group">
+          <h3>Slice text color</h3>
+          <div class="field">
+            <div class="seg" data-seg="wheel.labelColorMode"><button data-value="auto">Automatic</button><button data-value="custom">Choose a color</button></div>
+            <label class="swatch" data-show="wheel.labelColorMode=custom"><input type="color" data-bind="wheel.labelColor" aria-label="Slice text color" /></label>
+          </div>
+          <p class="help after" data-show="wheel.labelColorMode=auto">Uses black or white on each slice so the text is always easy to read.</p>
+        </div>
+        <div class="group">
+          <h3>Wheel details</h3>
+          <div class="field"><span class="lbl">Outer ring</span><label class="swatch"><input type="color" data-bind="wheel.rimColor" aria-label="Outer ring color" /></label></div>
+          <div class="field"><span class="lbl">Center and pointer</span><label class="swatch"><input type="color" data-bind="wheel.hubColor" aria-label="Center color" /></label></div>
+          <div class="field"><span class="lbl">Center circle</span><label class="swatch"><input type="color" data-bind="wheel.ringColor" aria-label="Center circle color" /></label></div>
+          <div class="field">
+            <span class="lbl">Lines between slices</span>
+            <div class="range"><input type="range" min="0" max="1" step="0.01" data-bind="wheel.separatorOpacity" aria-label="Line strength" /><output data-for="wheel.separatorOpacity" data-fmt="pct"></output></div>
+            <label class="swatch"><input type="color" data-bind="wheel.separatorColor" aria-label="Line color" /></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- BACKGROUND -->
+      <section class="panel" id="p-bg" role="tabpanel" aria-labelledby="t-bg" hidden>
+        <div class="group">
+          <h3>Background</h3>
+          <div class="seg full" data-seg="background.type" style="margin:8px 0 14px"><button data-value="solid">Solid color</button><button data-value="gradient">Gradient</button><button data-value="image">Photo</button></div>
+          <div class="field" data-show="background.type=solid|image"><span class="lbl" id="bgColorLabel">Color</span><label class="swatch"><input type="color" data-bind="background.color" aria-labelledby="bgColorLabel" /></label></div>
+          <div data-show="background.type=gradient">
+            <div class="field"><span class="lbl">Top color</span><label class="swatch"><input type="color" data-bind="background.color" aria-label="Gradient first color" /></label></div>
+            <div class="field"><span class="lbl">Bottom color</span><label class="swatch"><input type="color" data-bind="background.color2" aria-label="Gradient second color" /></label></div>
+            <div class="field"><span class="lbl">Direction</span><div class="range"><input type="range" min="0" max="360" step="5" data-bind="background.angle" aria-label="Gradient direction" /><output data-for="background.angle" data-fmt="deg"></output></div></div>
+          </div>
+          <div data-show="background.type=image">
+            <button class="drop" id="bgDrop" type="button" style="margin-top:10px">
+              <span class="thumb" id="bgThumb"><svg class="i"><use href="#i-image"/></svg></span>
+              <span><strong id="bgDropTitle">Upload a photo</strong><span class="sub">Click, or drop an image here. Tall photos work best.</span></span>
+            </button>
+            <input type="file" id="bgFile" accept="image/*" hidden />
+            <div class="field" style="margin-top:10px"><span class="lbl">Darken photo</span><div class="range"><input type="range" min="0" max="0.9" step="0.05" data-bind="background.overlay" aria-label="Darken photo" /><output data-for="background.overlay" data-fmt="pct"></output></div></div>
+            <div class="row" id="bgRemoveRow"><button class="btn ghost" id="bgRemove"><svg class="i"><use href="#i-trash"/></svg>Remove photo</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TEXT -->
+      <section class="panel" id="p-text" role="tabpanel" aria-labelledby="t-text" hidden>
+        <div class="group">
+          <div class="field"><h3 style="margin:0">Top badge</h3><label class="switch"><input type="checkbox" data-bind="header.show" aria-label="Show top badge" /><span></span></label></div>
+          <div data-show="header.show">
+            <div class="field"><span class="lbl">Badge text</span><input class="input" type="text" data-bind="header.label" placeholder="e.g. Race" /></div>
+            <div class="field stack" style="margin-top:12px">
+              <span class="lbl">Icon</span>
+              <div class="emoji-grid" id="emojiGrid"></div>
+              <div class="row">
+                <input class="input" id="iconText" type="text" placeholder="Or paste any emoji" style="flex:1" aria-label="Custom emoji" />
+                <button class="btn" id="iconUploadBtn"><svg class="i"><use href="#i-upload"/></svg>Upload image</button>
+                <input type="file" id="iconFile" accept="image/*" hidden />
+              </div>
+            </div>
+            <div class="field"><span class="lbl">Text color</span><label class="swatch"><input type="color" data-bind="header.labelColor" aria-label="Badge text color" /></label></div>
+            <div class="field"><span class="lbl">Badge color</span><label class="swatch"><input type="color" data-bind="header.pillColor" aria-label="Badge color" /></label></div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="field"><h3 style="margin:0">Result text</h3><label class="switch"><input type="checkbox" data-bind="title.show" aria-label="Show result text" /><span></span></label></div>
+          <p class="help">The big text above the wheel. It follows the pointer while spinning, then shows the winner.</p>
+          <div data-show="title.show">
+            <div class="field stack"><label class="lbl" for="titleInitial">Text before the spin</label><input class="input" id="titleInitial" type="text" data-bind="title.initial" placeholder="Leave empty to show the slice under the pointer" /></div>
+            <div class="field"><span class="lbl">Size</span><div class="range"><input type="range" min="40" max="140" step="1" data-bind="title.size" aria-label="Result text size" /><output data-for="title.size" data-fmt="px"></output></div></div>
+            <div class="field"><span class="lbl">Color</span><label class="swatch"><input type="color" data-bind="title.color" aria-label="Result text color" /></label></div>
+          </div>
+        </div>
+        <div class="group">
+          <h3>Font</h3>
+          <div class="field"><span class="lbl">Typeface</span><select class="input" data-bind="font" id="fontSelect" aria-label="Typeface"></select></div>
+          <div class="field"><span class="lbl">Slice text size</span><div class="range"><input type="range" min="20" max="100" step="1" data-bind="wheel.labelMaxSize" aria-label="Slice text size" /><output data-for="wheel.labelMaxSize" data-fmt="px"></output></div></div>
+          <div class="field"><span class="lbl">Slice text weight</span><div class="seg" data-seg="wheel.labelWeight"><button data-value="400">Regular</button><button data-value="500">Medium</button><button data-value="700">Bold</button></div></div>
+          <p class="help after">Long slice names shrink automatically to fit.</p>
+        </div>
+      </section>
+
+      <!-- SPIN & VIDEO -->
+      <section class="panel" id="p-spin" role="tabpanel" aria-labelledby="t-spin" hidden>
+        <div class="group">
+          <h3>Speed</h3>
+          <div class="seg full" id="speedSeg" role="group" aria-label="Spin speed" style="margin-top:8px">
+            <button data-speed="slow">Slow</button><button data-speed="normal">Normal</button><button data-speed="fast">Fast</button><button data-speed="custom">Custom</button>
+          </div>
+          <details class="more" id="speedMore">
+            <summary><svg class="i"><use href="#i-chevron"/></svg>Fine-tune</summary>
+            <div>
+              <div class="field"><span class="lbl">Spin length</span><div class="range"><input type="range" min="2" max="30" step="0.5" data-bind="spin.duration" aria-label="Spin length in seconds" /><output data-for="spin.duration" data-fmt="s"></output></div></div>
+              <div class="field"><span class="lbl">Full turns</span><div class="range"><input type="range" min="1" max="30" step="1" data-bind="spin.rotations" aria-label="Full turns" /><output data-for="spin.rotations" data-fmt="n"></output></div></div>
+              <div class="field"><span class="lbl">Ending</span><div class="range"><input type="range" min="1.5" max="8" step="0.1" data-bind="spin.deceleration" aria-label="How slowly it creeps to a stop" /><output data-for="spin.deceleration" data-fmt="decel"></output></div></div>
+              <p class="help after">A more dramatic ending spends longer creeping toward the final slice.</p>
+            </div>
+          </details>
+        </div>
+        <div class="group">
+          <h3>Who wins</h3>
+          <div class="field"><span class="lbl">Winner</span><select class="input" id="winnerSelect" aria-label="Winner"></select></div>
+          <p class="help after">Random uses each slice's chance. Picking a slice makes every spin land there.</p>
+        </div>
+        <div class="group">
+          <h3>After it stops</h3>
+          <div class="field"><span class="lbl">Dim the other slices</span><label class="switch"><input type="checkbox" data-bind="result.dimLosers" aria-label="Dim the other slices" /><span></span></label></div>
+          <div class="field"><span class="lbl">Pop the result text</span><label class="switch"><input type="checkbox" data-bind="result.pop" aria-label="Pop the result text" /><span></span></label></div>
+        </div>
+        <div class="group">
+          <h3>Video</h3>
+          <p class="help">Vertical 1080 × 1920 video, ready for Reels, TikTok and Shorts. It records in real time, so keep this tab open until it downloads.</p>
+          <div class="field"><span class="lbl">Pause before spinning</span><div class="range"><input type="range" min="0" max="5" step="0.5" data-bind="export.holdStart" aria-label="Pause before spinning" /><output data-for="export.holdStart" data-fmt="s"></output></div></div>
+          <div class="field"><span class="lbl">Pause on the result</span><div class="range"><input type="range" min="1" max="10" step="0.5" data-bind="export.holdEnd" aria-label="Pause on the result" /><output data-for="export.holdEnd" data-fmt="s"></output></div></div>
+          <div class="field"><span class="lbl">Quality</span><div class="seg" data-seg="export.bitrate"><button data-value="8">Standard</button><button data-value="16">High</button><button data-value="30">Best</button></div></div>
+          <div class="field"><span class="lbl">Smoothness</span><div class="seg" data-seg="export.fps"><button data-value="30">30 fps</button><button data-value="60">60 fps</button></div></div>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <main class="preview">
+    <div class="stage" id="stage">
+      <canvas id="wheel" width="1080" height="1920" tabindex="0" role="button" aria-label="Spin the wheel"></canvas>
+    </div>
+    <p class="status" id="status" aria-live="polite">Click the wheel or press Spin to try it.</p>
+    <div class="actions">
+      <button class="btn lg" id="spinBtn"><svg class="i"><use href="#i-play"/></svg>Spin</button>
+      <button class="btn lg primary" id="downloadBtn"><svg class="i"><use href="#i-download"/></svg><span id="downloadLabel">Download video</span></button>
+    </div>
+  </main>
 </div>
-<div id="rec">● Recording…</div>
 
-<button id="gear" title="Settings (E)">⚙</button>
-<div id="panel"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo" hidden>Undo</button></div>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6m2.5 0-.8 13.1A2 2 0 0 1 15.7 21H8.3a2 2 0 0 1-2-1.9L5.5 6M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.2" fill="currentColor"/><circle cx="15" cy="6" r="1.2" fill="currentColor"/><circle cx="9" cy="12" r="1.2" fill="currentColor"/><circle cx="15" cy="12" r="1.2" fill="currentColor"/><circle cx="9" cy="18" r="1.2" fill="currentColor"/><circle cx="15" cy="18" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+  <symbol id="i-equal" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8.3"/><path d="M3 3v5.3h5.3"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 20V9m-5 5 5-5 5 5M5 4h14"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></symbol>
+</svg>
 <script>
 /* =========================================================================
-   DEFAULT CONFIG — edit here, in the settings panel (E), or pass ?c=<share>
+   Spin Wheel Maker. Everything below is driven by one config object (cfg).
    ========================================================================= */
-const DEFAULT_CONFIG = {
-  font: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif',
-  header: { show: true, icon: '🧬', label: 'Race', labelColor: '#1a8cff', pillColor: '#1c1c1e' },
-  title:  { show: true, initial: '', color: '#ffffff', size: 76 },
-  background: { type: 'solid', color: '#000000', color2: '#1b1040', angle: 180, image: '', overlay: 0 },
-  wheel: {
-    colorMode: 'gradient',                 // 'gradient' = blend across segments, 'cycle' = repeat list
-    colors: ['#f4fbff', '#9fd4f2', '#7fa0f0', '#1f5fff', '#0a3fc0', '#122a7a', '#1b1040'],
-    labelColor: '#ffffff', labelWeight: 500, labelMaxSize: 52,
-    rimColor: '#2a2a2c', hubColor: '#1f1f21', ringColor: '#56565a', separatorColor: '#000000', separatorOpacity: 0.18
-  },
-  // Clockwise from the top. "color" / "textColor" are optional per-segment overrides.
-  segments: [
-    { label: 'God', weight: 0.7, color: '#ffffff' },
-    { label: 'Demigod', weight: 1.6, color: '#8fd3f0' },
-    { label: 'Demon', weight: 2.6, color: '#6b1212' },
-    { label: 'Archangel', weight: 3 },
-    { label: 'Angel', weight: 3.4 },
-    { label: 'Cyborg', weight: 3.8 },
-    { label: 'Titan', weight: 3.8 },
-    { label: 'Lizard Person', weight: 4 },
-    { label: 'Giant', weight: 4 },
-    { label: 'Goblin', weight: 4 },
-    { label: 'Orc', weight: 4 },
-    { label: 'Dwarf', weight: 4 },
-    { label: 'Elf', weight: 4 },
-    { label: 'Skeleton', weight: 4 },
-    { label: 'Zombie', weight: 4 },
-    { label: 'Human', weight: 46 }
-  ],
-  spin: { duration: 9, rotations: 6, deceleration: 4, autoSpin: false, autoSpinDelay: 1 },
-  result: { mode: 'random', fixedLabel: 'God', dimLosers: true, dimAmount: 0.6, pop: true },
-  export: { fps: 30, holdStart: 1, holdEnd: 2.5, bitrate: 16, format: 'auto' }
-};
-
-const PRESETS = {
-  'Race (blue gradient)': DEFAULT_CONFIG,
-  'Rainbow palette': {
-    ...DEFAULT_CONFIG,
-    header: { ...DEFAULT_CONFIG.header, icon: '⚡', label: 'Type of God' },
-    wheel: { ...DEFAULT_CONFIG.wheel, colorMode: 'cycle',
-      colors: ['#e0483e', '#ee8a2a', '#d8a92a', '#6d6d72', '#8b5cf6', '#4f7fe0', '#3aa0a8', '#5aa84a', '#d9537a'] },
-    segments: ['Plagues','Pain','Decay','Nightmares','Despair','Betrayal','Wealth','Kings','Rulers','Charisma','Love',
-      'Friendship','Loyalty','Justice','Law','Freedom','Trade','Fame','Chance','Secrets','Lies','Truth','Mirrors','Gravity',
-      'Sound','Silence','Portals','Dimensions','Technology','Thunder','Lightning','Fire','Water','Ice','Wind','Earth',
-      'Time','Space','Reality','Fate','Prophecy','Death','Souls','Chaos','Evil','Suffering','Blood']
-      .map(n => ({ label: 'God of ' + n, weight: 1 }))
-  }
-};
-
-/* ========================================================================= */
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const clone = o => JSON.parse(JSON.stringify(o));
 const W = 1080, H = 1920, CX = 540, CY = 1228, R = 505;
 const TAU = Math.PI * 2;
 
+const FONTS = [
+  ['System (clean)', '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif'],
+  ['Poppins (friendly)', '"Poppins", -apple-system, sans-serif'],
+  ['Montserrat (bold, modern)', '"Montserrat", -apple-system, sans-serif'],
+  ['Nunito (rounded)', '"Nunito", -apple-system, sans-serif'],
+  ['Bebas Neue (tall headlines)', '"Bebas Neue", Impact, sans-serif'],
+  ['Playfair (elegant)', '"Playfair Display", Georgia, serif']
+];
+
+const THEMES = [
+  ['Ocean', 'gradient', ['#f4fbff', '#9fd4f2', '#7fa0f0', '#1f5fff', '#0a3fc0', '#122a7a', '#1b1040']],
+  ['Rainbow', 'cycle', ['#e0483e', '#ee8a2a', '#d8a92a', '#6d6d72', '#8b5cf6', '#4f7fe0', '#3aa0a8', '#5aa84a', '#d9537a']],
+  ['Candy', 'cycle', ['#ff6b9d', '#ffc15e', '#7ee0c3', '#6ea8ff', '#c79bff']],
+  ['Sunset', 'gradient', ['#ffd166', '#f78c6b', '#ef476f', '#8a2be2', '#2b1055']],
+  ['Forest', 'gradient', ['#e3f5e1', '#95d5b2', '#52b788', '#2d6a4f', '#0b2a1e']],
+  ['Neon', 'cycle', ['#39ff14', '#ff2bd6', '#00e5ff', '#fff200']],
+  ['Earth', 'cycle', ['#c65d3b', '#e2b659', '#6f8f5d', '#3f6e8c', '#8b5e3c']],
+  ['Mono', 'gradient', ['#f5f5f5', '#1a1a1a']]
+];
+
+const EMOJI = ['🎡', '🧬', '⚡', '🔥', '🏆', '🎁', '🎉', '⭐', '🍕', '❤️', '🎲', '🎯', '👑', '💰', '🌍', '🤔'];
+
+const SPEEDS = { slow: { duration: 14, rotations: 6 }, normal: { duration: 9, rotations: 6 }, fast: { duration: 5, rotations: 8 } };
+
+const DEFAULT_CONFIG = {
+  font: FONTS[0][1],
+  header: { show: true, icon: '🧬', label: 'Race', labelColor: '#1a8cff', pillColor: '#1c1c1e' },
+  title: { show: true, initial: '', color: '#ffffff', size: 76 },
+  background: { type: 'solid', color: '#000000', color2: '#1b1040', angle: 180, image: '', overlay: 0.3 },
+  wheel: {
+    colorMode: 'gradient',
+    colors: THEMES[0][2].slice(),
+    labelColorMode: 'auto', labelColor: '#ffffff', labelWeight: 500, labelMaxSize: 52,
+    rimColor: '#2a2a2c', hubColor: '#1f1f21', ringColor: '#56565a', separatorColor: '#000000', separatorOpacity: 0.18
+  },
+  // Clockwise from the top. "color" / "textColor" are optional per-slice overrides.
+  segments: [
+    { label: 'God', weight: 0.7, color: '#ffffff' },
+    { label: 'Demigod', weight: 1.6, color: '#8fd3f0' },
+    { label: 'Demon', weight: 2.6, color: '#6b1212' },
+    { label: 'Archangel', weight: 3 }, { label: 'Angel', weight: 3.4 }, { label: 'Cyborg', weight: 3.8 },
+    { label: 'Titan', weight: 3.8 }, { label: 'Lizard Person', weight: 4 }, { label: 'Giant', weight: 4 },
+    { label: 'Goblin', weight: 4 }, { label: 'Orc', weight: 4 }, { label: 'Dwarf', weight: 4 },
+    { label: 'Elf', weight: 4 }, { label: 'Skeleton', weight: 4 }, { label: 'Zombie', weight: 4 },
+    { label: 'Human', weight: 46 }
+  ],
+  spin: { duration: 9, rotations: 6, deceleration: 4, autoSpin: false, autoSpinDelay: 1 },
+  result: { mode: 'random', fixedLabel: '', dimLosers: true, dimAmount: 0.6, pop: true },
+  export: { fps: 30, holdStart: 1, holdEnd: 2.5, bitrate: 16, format: 'auto' }
+};
+
 function deepMerge(base, over) {
   const out = clone(base);
   for (const k in over || {}) {
-    if (over[k] && typeof over[k] === 'object' && !Array.isArray(over[k]) && typeof out[k] === 'object') out[k] = deepMerge(out[k], over[k]);
+    if (over[k] && typeof over[k] === 'object' && !Array.isArray(over[k]) && out[k] && typeof out[k] === 'object') out[k] = deepMerge(out[k], over[k]);
     else out[k] = over[k];
   }
   return out;
 }
+const preset = over => deepMerge(DEFAULT_CONFIG, over);
+
+const PRESETS = [
+  ['Race', DEFAULT_CONFIG],
+  ['Type of God', preset({
+    header: { icon: '⚡', label: 'Type of God' },
+    wheel: { colorMode: 'cycle', colors: THEMES[1][2].slice() },
+    segments: ['Plagues', 'Pain', 'Decay', 'Nightmares', 'Despair', 'Betrayal', 'Wealth', 'Kings', 'Rulers', 'Charisma', 'Love',
+      'Friendship', 'Loyalty', 'Justice', 'Law', 'Freedom', 'Trade', 'Fame', 'Chance', 'Secrets', 'Lies', 'Truth', 'Mirrors', 'Gravity',
+      'Sound', 'Silence', 'Portals', 'Dimensions', 'Technology', 'Thunder', 'Lightning', 'Fire', 'Water', 'Ice', 'Wind', 'Earth',
+      'Time', 'Space', 'Reality', 'Fate', 'Prophecy', 'Death', 'Souls', 'Chaos', 'Evil', 'Suffering', 'Blood'].map(n => ({ label: 'God of ' + n, weight: 1 }))
+  })],
+  ['Dinner tonight', preset({
+    font: FONTS[1][1],
+    header: { icon: '🍕', label: 'Dinner Tonight', labelColor: '#ffd166', pillColor: '#2b1a3d' },
+    title: { size: 84 },
+    background: { type: 'gradient', color: '#3a0ca3', color2: '#0b0014', angle: 180 },
+    wheel: { colorMode: 'cycle', colors: ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#8338ec'], labelWeight: 700, rimColor: '#1a0f26', hubColor: '#1a0f26' },
+    segments: ['Pizza', 'Sushi', 'Tacos', 'Burgers', 'Ramen', 'Curry', 'Pasta', 'Salad', 'Injera', 'Kebab'].map(label => ({ label, weight: 1 })),
+    spin: { duration: 6, rotations: 10, deceleration: 3 }
+  })],
+  ['Yes or no', preset({
+    font: FONTS[2][1],
+    header: { icon: '🤔', label: 'Should I?', labelColor: '#ffffff', pillColor: '#23232a' },
+    background: { type: 'gradient', color: '#1f2433', color2: '#07080c', angle: 180 },
+    wheel: { colorMode: 'cycle', colors: ['#22c55e', '#ef4444'], labelWeight: 700, labelMaxSize: 90 },
+    segments: [{ label: 'Yes', weight: 1 }, { label: 'No', weight: 1 }, { label: 'Yes', weight: 1 }, { label: 'No', weight: 1 }],
+    spin: { duration: 7, rotations: 8, deceleration: 3.5 }
+  })],
+  ['Blank', preset({
+    header: { icon: '🎡', label: 'Spin the wheel', labelColor: '#ffffff', pillColor: '#23232a' },
+    wheel: { colorMode: 'cycle', colors: THEMES[2][2].slice() },
+    segments: [1, 2, 3, 4, 5, 6].map(n => ({ label: 'Option ' + n, weight: 1 }))
+  })]
+];
 
 function loadConfig() {
   if (window.__WHEEL_CONFIG) return deepMerge(DEFAULT_CONFIG, window.__WHEEL_CONFIG);
-  if (window.__WHEEL_PRESET && PRESETS[window.__WHEEL_PRESET]) return clone(PRESETS[window.__WHEEL_PRESET]);
+  const byName = window.__WHEEL_PRESET && PRESETS.find(p => p[0].toLowerCase() === String(window.__WHEEL_PRESET).toLowerCase());
+  if (byName) return clone(byName[1]);
   const p = new URLSearchParams(location.search);
   if (p.get('c')) {
     try { return deepMerge(DEFAULT_CONFIG, JSON.parse(decodeURIComponent(escape(atob(p.get('c')))))); } catch (e) { console.warn(e); }
@@ -156,7 +534,13 @@ function loadConfig() {
   return clone(DEFAULT_CONFIG);
 }
 let cfg = loadConfig();
-function saveConfig() { try { localStorage.setItem('spinWheelConfig', JSON.stringify(cfg)); } catch (e) {} }
+let storageWarned = false;
+function saveConfig() {
+  if (new URLSearchParams(location.search).get('render') === '1') return;
+  try { localStorage.setItem('spinWheelConfig', JSON.stringify(cfg)); }
+  catch (e) { if (!storageWarned) { storageWarned = true; toast('This browser is out of space for photos. Use Save to keep a copy.'); } }
+}
+
 
 /* ---------- colors ---------- */
 function hexToRgb(h) {
@@ -174,24 +558,36 @@ function gradientAt(stops, t) {
 }
 
 /* ---------- wheel model ---------- */
-let segs = [];     // { label, color, textColor, start, end }
-function buildSegments() {
-  const list = cfg.segments.filter(s => s.label !== undefined && +s.weight > 0);
-  if (!list.length) list.push({ label: '—', weight: 1 });
-  const total = list.reduce((a, s) => a + +s.weight, 0);
-  const colors = (cfg.wheel.colors || []).filter(Boolean);
+function relLum(hex) {
+  return hexToRgb(hex).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+    .reduce((a, v, k) => a + v * [0.2126, 0.7152, 0.0722][k], 0);
+}
+const autoText = hex => { try { return relLum(hex) > 0.36 ? '#141414' : '#ffffff'; } catch { return '#ffffff'; } };
+
+// Pure: turns a config into drawable slices. srcIndex points back into c.segments.
+function computeSegments(c) {
+  const colors = (c.wheel.colors || []).filter(Boolean);
   if (!colors.length) colors.push('#888888');
+  const list = [];
+  (c.segments || []).forEach((s, i) => { const w = +s.weight; if (w > 0) list.push({ s, i, w }); });
+  if (!list.length) list.push({ s: { label: '' }, i: -1, w: 1 });
+  const total = list.reduce((a, x) => a + x.w, 0);
   let acc = 0;
-  segs = list.map((s, i) => {
-    const span = (+s.weight / total) * TAU;
-    const auto = cfg.wheel.colorMode === 'cycle'
-      ? colors[i % colors.length]
-      : gradientAt(colors, list.length === 1 ? 0 : i / (list.length - 1));
-    const seg = { label: String(s.label), color: s.color || auto, textColor: s.textColor || cfg.wheel.labelColor, start: acc, end: acc + span, weight: +s.weight };
+  return list.map((x, k) => {
+    const span = (x.w / total) * TAU;
+    const auto = c.wheel.colorMode === 'cycle' ? colors[k % colors.length] : gradientAt(colors, list.length === 1 ? 0 : k / (list.length - 1));
+    const color = x.s.color || auto;
+    const textColor = x.s.textColor || (c.wheel.labelColorMode === 'custom' ? c.wheel.labelColor : autoText(color));
+    const seg = { label: String(x.s.label ?? ''), color, autoColor: auto, textColor, start: acc, end: acc + span, weight: x.w, srcIndex: x.i };
     acc += span;
     return seg;
   });
 }
+function wheelCSS(c) {
+  return 'conic-gradient(' + computeSegments(c).map(s => `${s.color} ${(s.start / TAU * 100).toFixed(2)}% ${(s.end / TAU * 100).toFixed(2)}%`).join(', ') + ')';
+}
+let segs = [], segBySrc = new Map();
+function buildSegments() { segs = computeSegments(cfg); segBySrc = new Map(segs.map(s => [s.srcIndex, s])); }
 
 /* ---------- state ---------- */
 let rotation = 0;           // radians, clockwise
@@ -370,6 +766,7 @@ function pickWinner() {
 
 function spin() {
   if (spinning) return;
+  onSpinStart();
   spinning = true; winnerIndex = -1; dimT = 0;
   const win = pickWinner(), s = segs[win];
   const target = s.start + (s.end - s.start) * (0.15 + Math.random() * 0.7);   // local angle under pointer
@@ -392,6 +789,7 @@ function spin() {
 
 function finish(win) {
   spinning = false; winnerIndex = win;
+  onSpinEnd(win);
   rotation = ((rotation % TAU) + TAU) % TAU;
   titleText = segs[win].label;
   const t0 = performance.now();
@@ -412,6 +810,7 @@ function resetWheel() {
   draw();
 }
 
+
 /* ---------- apply config ---------- */
 function loadImage(src, prev) {
   if (!src) return null;
@@ -423,17 +822,28 @@ function loadImage(src, prev) {
   return img;
 }
 
+let fontToken = 0;
+function ensureFont() {
+  if (!document.fonts || !document.fonts.load) return Promise.resolve();
+  const t = ++fontToken, fam = cfg.font;
+  const weights = new Set([400, 500, 600, +cfg.wheel.labelWeight || 500]);
+  return Promise.all([...weights].map(w => document.fonts.load(`${w} 48px ${fam}`).catch(() => {})))
+    .then(() => { if (t === fontToken) draw(); });
+}
+
+let uiReady = false;
 function applyConfig() {
   buildSegments();
   const b = cfg.background, icon = cfg.header.icon || '';
   bgImg = b.type === 'image' ? loadImage(b.image, bgImg) : null;
   iconImg = /^(https?:|data:|\.{0,2}\/)/.test(icon) ? loadImage(icon, iconImg) : null;
-
   if (winnerIndex >= segs.length) winnerIndex = -1;
   currentIndex = -1;
   if (!spinning && winnerIndex < 0) titleText = cfg.title.initial || segs[indexAtPointer(rotation)].label;
+  ensureFont();
   draw();
   saveConfig();
+  if (uiReady) refreshDerived();
 }
 
 /* ---------- video export (records the canvas in real time) ---------- */
@@ -444,13 +854,16 @@ function pickMime() {
   const order = cfg.export.format === 'webm' ? [...webm, ...mp4] : [...mp4, ...webm];
   return order.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
 }
+const slug = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') || 'wheel';
 
 async function recordVideo() {
   if (recording || spinning) return;
   const mime = pickMime();
-  if (!mime) { alert('This browser cannot record video. Use Chrome, Edge or Safari, or run: node render.mjs'); return; }
+  if (!mime) { toast('This browser can’t record video. Try Chrome, Edge or Safari.'); return; }
   const e = cfg.export;
-  recording = true; document.body.classList.add('recording');
+  const holdStart = Math.max(0, +e.holdStart || 0), holdEnd = Math.max(0.6, +e.holdEnd || 0);
+  const totalMs = (holdStart + Math.max(0.2, +cfg.spin.duration) + holdEnd) * 1000;
+  setRecordingUI(true);
   resetWheel();
   const stream = canvas.captureStream(+e.fps || 30);
   const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: (+e.bitrate || 16) * 1e6 });
@@ -458,216 +871,473 @@ async function recordVideo() {
   rec.ondataavailable = ev => ev.data.size && chunks.push(ev.data);
   const stopped = new Promise(r => (rec.onstop = r));
   const keepAlive = () => { if (!recording) return; draw(); requestAnimationFrame(keepAlive); };
+  const t0 = performance.now();
+  const ticker = setInterval(() => {
+    const el = performance.now() - t0;
+    $('#downloadBtn').style.setProperty('--p', Math.min(1, el / totalMs));
+    $('#downloadLabel').textContent = `Recording… ${Math.max(0, Math.ceil((totalMs - el) / 1000))}s left`;
+  }, 200);
   rec.start(250); keepAlive();
 
-  await sleep(+e.holdStart || 0);
+  await sleep(holdStart);
   spin();
   while (spinning) await sleep(0.05);
-  await sleep(Math.max(0.6, +e.holdEnd || 0));
+  await sleep(holdEnd);
   rec.stop(); await stopped;
+  clearInterval(ticker);
   stream.getTracks().forEach(t => t.stop());
-  recording = false; document.body.classList.remove('recording');
+  setRecordingUI(false);
 
   const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
-  const name = `wheel-${(segs[winnerIndex]?.label || 'spin').replace(/[^\w-]+/g, '-').toLowerCase()}.${ext}`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(chunks, { type: mime.split(';')[0] }));
-  a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  a.download = `${slug(cfg.header.label)}-${slug(segs[winnerIndex]?.label)}.${ext}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 20000);
+  toast(`Video saved to your Downloads (${a.download})`);
 }
 
-/* ---------- layout ---------- */
-function fit() {
-  const vp = $('#viewport').getBoundingClientRect();
-  const s = Math.min(vp.width / W, vp.height / H);
-  $('#stage').style.transform = `translate(-50%, -50%) scale(${s})`;
+function setRecordingUI(on) {
+  recording = on;
+  const btn = $('#downloadBtn');
+  btn.classList.toggle('recording', on);
+  btn.style.setProperty('--p', 0);
+  btn.setAttribute('aria-disabled', on);
+  $('#downloadLabel').textContent = on ? 'Recording…' : 'Download video';
+  $('#editor').inert = on;
+  ['#spinBtn', '#shareBtn', '#saveBtn', '#openBtn'].forEach(s => ($(s).disabled = on));
+  if (on) setStatus('Recording your video. Keep this tab open.');
 }
-window.addEventListener('resize', fit);
 
-/* ---------- settings panel ---------- */
-const get = path => path.split('.').reduce((o, k) => o[k], cfg);
+/* ---------- UI helpers ---------- */
+const get = path => path.split('.').reduce((o, k) => (o == null ? o : o[k]), cfg);
 const set = (path, v) => { const ks = path.split('.'), last = ks.pop(); ks.reduce((o, k) => o[k], cfg)[last] = v; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const svg = id => `<svg class="i"><use href="#i-${id}"/></svg>`;
 
-function segmentsToText() {
-  return cfg.segments.map(s => [s.label, s.weight, s.color || '', s.textColor || ''].join(' | ').replace(/( \| )+$/, '')).join('\n');
+function setStatus(html) { $('#status').innerHTML = html; }
+
+let toastTimer = null, undoFn = null;
+function toast(msg, undo) {
+  $('#toastMsg').textContent = msg;
+  undoFn = undo || null;
+  $('#toastUndo').hidden = !undo;
+  $('#toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('#toast').classList.remove('show'), undo ? 6000 : 3500);
 }
-function textToSegments(txt) {
-  return txt.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
-    const [label, weight, color, textColor] = l.split('|').map(x => x.trim());
-    const s = { label, weight: weight === undefined || weight === '' ? 1 : parseFloat(weight) || 0 };
-    if (color) s.color = color;
-    if (textColor) s.textColor = textColor;
-    return s;
+$('#toastUndo').onclick = () => { if (undoFn) undoFn(); undoFn = null; $('#toast').classList.remove('show'); };
+
+function withUndo(msg, change) {
+  const prev = clone(cfg);
+  change();
+  toast(msg, () => replaceConfig(prev));
+}
+
+function replaceConfig(next) {
+  cfg = next; resetWheel(); applyConfig(); renderAll();
+  $('#spinBtn').disabled = recording;
+  setStatus('Click the wheel or press Spin to try it.');
+}
+
+function fmt(kind, v) {
+  v = +v;
+  switch (kind) {
+    case 'pct': return Math.round(v * 100) + '%';
+    case 's': return (Math.round(v * 10) / 10) + ' s';
+    case 'px': return Math.round(v) + ' px';
+    case 'deg': return Math.round(v) + '°';
+    case 'decel': return v < 2.6 ? 'Quick' : v < 4.6 ? 'Smooth' : v < 6.4 ? 'Slow' : 'Dramatic';
+    default: return String(v);
+  }
+}
+
+function fileToDataURL(file, maxW, maxH, type = 'image/jpeg') {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL(type, 0.86));
+    };
+    img.onerror = () => reject(new Error('Not an image'));
+    img.src = URL.createObjectURL(file);
   });
 }
 
-function buildPanel() {
-  const P = $('#panel');
-  P.innerHTML = '';
-  const add = html => { const d = document.createElement('div'); d.innerHTML = html; while (d.firstChild) P.appendChild(d.firstChild); return P.lastChild; };
-  const sec = t => add(`<h3>${t}</h3>`);
-
-  const field = (label, path, type, opts = {}) => {
-    const v = get(path);
-    let input;
-    if (type === 'select') input = `<select>${opts.options.map(o => `<option value="${o[0]}" ${o[0] == v ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`;
-    else if (type === 'checkbox') input = `<input type="checkbox" ${v ? 'checked' : ''}>`;
-    else if (type === 'range') input = `<input type="range" min="${opts.min}" max="${opts.max}" step="${opts.step}" value="${v}"><span class="val">${v}</span>`;
-    else input = `<input type="${type}" value="${String(v).replace(/"/g, '&quot;')}" ${opts.step ? `step="${opts.step}"` : ''}>`;
-    const el = add(`<label><span>${label}</span>${input}</label>`);
-    const inp = el.querySelector('input,select');
-    inp.addEventListener('input', () => {
-      let val = type === 'checkbox' ? inp.checked : inp.value;
-      if (type === 'number' || type === 'range') val = parseFloat(val) || 0;
-      if (type === 'range') el.querySelector('.val').textContent = val;
-      set(path, val); applyConfig();
-      if (opts.rebuild) buildPanel();
-    });
-  };
-
-  add(`<h2>Spin Wheel Template</h2>
-    <div class="hint"><b>Space</b>/click wheel = spin · <b>V</b> = record video · <b>R</b> = reset · <b>E</b> = settings · <b>H</b> = clean mode (press H again to exit)</div>`);
-  const r = add(`<div class="row"><button class="primary" id="bSpin">Spin</button><button class="primary" id="bRec">⏺ Export video</button><button id="bReset">Reset</button><button id="bClean">Clean mode</button></div>`);
-  r.querySelector('#bSpin').onclick = () => { if (!recording) spin(); };
-  r.querySelector('#bRec').onclick = recordVideo;
-  r.querySelector('#bReset').onclick = () => { if (!recording) resetWheel(); };
-  r.querySelector('#bClean').onclick = () => document.body.classList.add('clean');
-
-  sec('Preset');
-  const pr = add(`<label><span>Load</span><select><option value="">— choose —</option>${Object.keys(PRESETS).map(k => `<option>${k}</option>`).join('')}</select></label>`);
-  pr.querySelector('select').onchange = e => { if (!e.target.value) return; cfg = clone(PRESETS[e.target.value]); resetWheel(); applyConfig(); buildPanel(); };
-
-  sec('Segments (text & weights)');
-  add(`<div class="hint">One per line, clockwise from the top:<br><code>Label | weight | #color | #textColor</code><br>Weight sets slice size & odds. Color and textColor are optional overrides.</div>`);
-  const ta = add(`<textarea rows="12"></textarea>`);
-  ta.value = segmentsToText();
-  ta.addEventListener('input', () => { cfg.segments = textToSegments(ta.value); applyConfig(); });
-
-  sec('Colors');
-  field('Mode', 'wheel.colorMode', 'select', { options: [['gradient', 'Gradient (blend)'], ['cycle', 'Palette (repeat)']] });
-  add(`<div class="hint">Color list — first = top segment. Used as gradient stops or a repeating palette.</div>`);
-  const colWrap = add(`<div class="row" id="colorList"></div>`);
-  const renderColors = () => {
-    colWrap.innerHTML = '';
-    cfg.wheel.colors.forEach((c, i) => {
-      const inp = document.createElement('input'); inp.type = 'color'; inp.value = c; inp.title = 'Right-click to remove';
-      inp.oninput = () => { cfg.wheel.colors[i] = inp.value; applyConfig(); };
-      inp.oncontextmenu = e => { e.preventDefault(); if (cfg.wheel.colors.length > 1) { cfg.wheel.colors.splice(i, 1); renderColors(); applyConfig(); } };
-      colWrap.appendChild(inp);
-    });
-    const plus = document.createElement('button'); plus.textContent = '+';
-    plus.onclick = () => { cfg.wheel.colors.push(cfg.wheel.colors.at(-1) || '#888888'); renderColors(); applyConfig(); };
-    const rev = document.createElement('button'); rev.textContent = '⇄'; rev.title = 'Reverse';
-    rev.onclick = () => { cfg.wheel.colors.reverse(); renderColors(); applyConfig(); };
-    colWrap.append(plus, rev);
-  };
-  renderColors();
-  const clr = add(`<div class="row"><button>Clear per-segment color overrides</button></div>`);
-  clr.querySelector('button').onclick = () => { cfg.segments.forEach(s => { delete s.color; }); ta.value = segmentsToText(); applyConfig(); };
-  field('Rim', 'wheel.rimColor', 'color');
-  field('Hub & pointer', 'wheel.hubColor', 'color');
-  field('Hub ring', 'wheel.ringColor', 'color');
-  field('Separator lines', 'wheel.separatorColor', 'color');
-  field('Separator opacity', 'wheel.separatorOpacity', 'range', { min: 0, max: 1, step: 0.01 });
-
-  sec('Speed');
-  field('Duration (s)', 'spin.duration', 'range', { min: 1, max: 30, step: 0.5 });
-  field('Full rotations', 'spin.rotations', 'range', { min: 1, max: 40, step: 1 });
-  field('Deceleration', 'spin.deceleration', 'range', { min: 1, max: 8, step: 0.1 });
-  add(`<div class="hint">Higher deceleration = fast start, long slow crawl at the end.</div>`);
-  field('Auto-spin on load', 'spin.autoSpin', 'checkbox');
-  field('Auto-spin delay (s)', 'spin.autoSpinDelay', 'number', { step: 0.1 });
-
-  sec('Result');
-  field('Winner', 'result.mode', 'select', { options: [['random', 'Random (weighted)'], ['fixed', 'Fixed segment']], rebuild: true });
-  if (cfg.result.mode === 'fixed') field('Land on', 'result.fixedLabel', 'select', { options: segs.map(s => [s.label, s.label]) });
-  field('Dim other segments', 'result.dimLosers', 'checkbox');
-  field('Dim amount', 'result.dimAmount', 'range', { min: 0, max: 1, step: 0.05 });
-  field('Pop animation', 'result.pop', 'checkbox');
-
-  sec('Background');
-  field('Type', 'background.type', 'select', { options: [['solid', 'Solid'], ['gradient', 'Gradient'], ['image', 'Image']], rebuild: true });
-  field('Color', 'background.color', 'color');
-  if (cfg.background.type === 'gradient') { field('Color 2', 'background.color2', 'color'); field('Angle', 'background.angle', 'range', { min: 0, max: 360, step: 1 }); }
-  if (cfg.background.type === 'image') {
-    field('Image URL', 'background.image', 'text');
-    const up = add(`<label><span>Upload</span><input type="file" accept="image/*"></label>`);
-    up.querySelector('input').onchange = e => {
-      const f = e.target.files[0]; if (!f) return;
-      const rd = new FileReader(); rd.onload = () => { cfg.background.image = rd.result; applyConfig(); buildPanel(); }; rd.readAsDataURL(f);
-    };
-    field('Darken', 'background.overlay', 'range', { min: 0, max: 1, step: 0.05 });
-  }
-
-  sec('Text');
-  field('Font family', 'font', 'text');
-  field('Show category pill', 'header.show', 'checkbox');
-  field('Pill icon (emoji/URL)', 'header.icon', 'text');
-  field('Pill label', 'header.label', 'text');
-  field('Pill label color', 'header.labelColor', 'color');
-  field('Pill background', 'header.pillColor', 'color');
-  field('Show title', 'title.show', 'checkbox');
-  field('Title before spin', 'title.initial', 'text');
-  field('Title color', 'title.color', 'color');
-  field('Title size', 'title.size', 'range', { min: 30, max: 140, step: 1 });
-  field('Label color', 'wheel.labelColor', 'color');
-  field('Label max size', 'wheel.labelMaxSize', 'range', { min: 16, max: 110, step: 1 });
-  field('Label weight', 'wheel.labelWeight', 'select', { options: [[300, 'Light'], [400, 'Regular'], [500, 'Medium'], [600, 'Semibold'], [700, 'Bold'], [800, 'Heavy']] });
-
-  sec('Video export');
-  add(`<div class="hint">Records one spin to a 1080×1920 video file in real time. Keep this tab visible while it records. Only the wheel canvas gets captured, never these controls.</div>`);
-  field('Format', 'export.format', 'select', { options: [['auto', 'MP4 (fallback WebM)'], ['webm', 'WebM']] });
-  field('Frame rate', 'export.fps', 'select', { options: [[30, '30 fps'], [60, '60 fps']] });
-  field('Hold before spin (s)', 'export.holdStart', 'number', { step: 0.1 });
-  field('Hold after result (s)', 'export.holdEnd', 'number', { step: 0.1 });
-  field('Bitrate (Mbps)', 'export.bitrate', 'range', { min: 4, max: 40, step: 1 });
-
-  sec('Save / share');
-  const io = add(`<div class="row"><button id="bCopy">Copy share link</button><button id="bExport">Export JSON</button><button id="bImport">Import JSON</button><button id="bDefault">Restore defaults</button></div>`);
-  io.querySelector('#bCopy').onclick = async () => {
-    const c = btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
-    const url = location.origin + location.pathname + '?c=' + c;
-    try { await navigator.clipboard.writeText(url); alert('Link copied. Add &clean=1 to hide controls.'); } catch { prompt('Copy this link:', url); }
-  };
-  io.querySelector('#bExport').onclick = () => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' }));
-    a.download = 'wheel-config.json'; a.click();
-  };
-  io.querySelector('#bImport').onclick = () => {
-    const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json';
-    f.onchange = () => f.files[0].text().then(t => { try { cfg = deepMerge(DEFAULT_CONFIG, JSON.parse(t)); resetWheel(); applyConfig(); buildPanel(); } catch (e) { alert('Invalid JSON'); } });
-    f.click();
-  };
-  io.querySelector('#bDefault').onclick = () => { cfg = clone(DEFAULT_CONFIG); resetWheel(); applyConfig(); buildPanel(); };
+function pctText(i) {
+  const total = cfg.segments.reduce((a, s) => a + Math.max(0, +s.weight || 0), 0);
+  const w = Math.max(0, +cfg.segments[i].weight || 0);
+  if (!total || !w) return '0%';
+  const p = (w / total) * 100;
+  return p < 1 ? '<1%' : p < 10 ? (Math.round(p * 10) / 10) + '%' : Math.round(p) + '%';
 }
 
-function togglePanel() { document.body.classList.toggle('panel-open'); fit(); }
+/* ---------- slices ---------- */
+let dragFrom = null;
+function renderSliceList(focusIndex, focusWhat = 'text') {
+  const L = $('#sliceList');
+  L.innerHTML = '';
+  cfg.segments.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'slice slice-grid';
+    row.innerHTML = `
+      <button class="grip" type="button" aria-label="Move slice ${i + 1}. Use the up and down arrow keys, or drag." title="Drag to reorder">${svg('grip')}</button>
+      <div class="swatch-wrap"><label class="swatch" title="Change this slice's color"><input type="color" aria-label="Color of slice ${i + 1}" /></label>
+        <button type="button" class="swatch-reset" title="Go back to the theme color" aria-label="Use theme color for slice ${i + 1}">${svg('undo')}</button></div>
+      <input class="input" type="text" aria-label="Text of slice ${i + 1}" placeholder="Slice text" />
+      <input class="input num" type="number" min="0" step="any" inputmode="decimal" aria-label="Chance of slice ${i + 1}" title="Higher = bigger slice and more likely to win" />
+      <span class="pct" title="Chance of winning"></span>
+      <button class="icon-btn danger" type="button" aria-label="Remove slice ${i + 1}" title="Remove">${svg('trash')}</button>`;
+    const [grip, , text, num] = [row.querySelector('.grip'), null, row.querySelector('input[type=text]'), row.querySelector('.num')];
+    const colorIn = row.querySelector('input[type=color]');
+    text.value = s.label ?? '';
+    num.value = s.weight;
+    text.addEventListener('input', () => { cfg.segments[i].label = text.value; applyConfig(); renderWinnerSelect(); });
+    text.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); i === cfg.segments.length - 1 ? addSlice() : L.children[i + 1]?.querySelector('input[type=text]').focus(); } });
+    num.addEventListener('input', () => { cfg.segments[i].weight = Math.max(0, parseFloat(num.value) || 0); applyConfig(); });
+    colorIn.addEventListener('input', () => { cfg.segments[i].color = colorIn.value; applyConfig(); });
+    row.querySelector('.swatch-reset').onclick = () => { delete cfg.segments[i].color; applyConfig(); };
+    row.querySelector('.icon-btn.danger').onclick = () => {
+      if (cfg.segments.length <= 1) return;
+      const name = cfg.segments[i].label || 'Slice';
+      withUndo(`Removed “${name}”`, () => { cfg.segments.splice(i, 1); applyConfig(); renderSliceList(); renderWinnerSelect(); });
+    };
+    grip.addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp' && i > 0) { e.preventDefault(); moveSlice(i, i - 1, 'grip'); }
+      if (e.key === 'ArrowDown' && i < cfg.segments.length - 1) { e.preventDefault(); moveSlice(i, i + 2, 'grip'); }
+    });
+    grip.addEventListener('pointerdown', () => {
+      row.draggable = true;
+      document.addEventListener('pointerup', () => { if (!row.classList.contains('dragging')) row.draggable = false; }, { once: true });
+    });
+    row.addEventListener('dragstart', e => { dragFrom = i; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); });
+    row.addEventListener('dragend', () => { row.draggable = false; row.classList.remove('dragging'); dragFrom = null; clearDropMarks(); });
+    row.addEventListener('dragover', e => {
+      if (dragFrom === null) return;
+      e.preventDefault();
+      const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+      clearDropMarks(); row.classList.add(after ? 'drop-after' : 'drop-before'); row.dataset.after = after ? '1' : '0';
+    });
+    row.addEventListener('drop', e => { e.preventDefault(); if (dragFrom !== null) moveSlice(dragFrom, i + (row.dataset.after === '1' ? 1 : 0)); });
+    L.appendChild(row);
+  });
+  refreshSliceRows();
+  if (focusIndex != null) {
+    const r = L.children[focusIndex];
+    const el = r && (focusWhat === 'grip' ? r.querySelector('.grip') : r.querySelector('input[type=text]'));
+    if (el) { el.focus(); if (el.select) el.select(); }
+  }
+}
+function clearDropMarks() { $$('.slice').forEach(r => r.classList.remove('drop-before', 'drop-after')); }
+function moveSlice(from, to, focusWhat) {
+  const [item] = cfg.segments.splice(from, 1);
+  if (to > from) to--;
+  cfg.segments.splice(to, 0, item);
+  applyConfig(); renderSliceList(to, focusWhat || 'none');
+}
+function addSlice() {
+  const last = cfg.segments[cfg.segments.length - 1];
+  cfg.segments.push({ label: 'Option ' + (cfg.segments.length + 1), weight: last ? last.weight || 1 : 1 });
+  applyConfig(); renderSliceList(cfg.segments.length - 1); renderWinnerSelect();
+}
+function refreshSliceRows() {
+  const rows = $('#sliceList').children;
+  const canRemove = cfg.segments.length > 1;
+  cfg.segments.forEach((s, i) => {
+    const row = rows[i]; if (!row) return;
+    const seg = segBySrc.get(i);
+    const color = seg ? seg.color : (s.color || '#d9d6cf');
+    const sw = row.querySelector('.swatch');
+    sw.style.setProperty('--c', color);
+    const ci = row.querySelector('input[type=color]'); if (document.activeElement !== ci) ci.value = /^#[0-9a-f]{6}$/i.test(color) ? color : '#888888';
+    row.querySelector('.swatch-reset').hidden = !s.color;
+    row.querySelector('.pct').textContent = pctText(i);
+    row.classList.toggle('zero', !seg);
+    row.querySelector('.icon-btn.danger').disabled = !canRemove;
+  });
+}
+function parsePaste(txt) {
+  return txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+    const cols = l.split(/\t|\s*\|\s*/);
+    const n = cols.length > 1 ? parseFloat(cols[cols.length - 1].replace('%', '')) : NaN;
+    return Number.isFinite(n) && n >= 0 ? { label: cols.slice(0, -1).join(' ').trim(), weight: n } : { label: l, weight: 1 };
+  });
+}
+
+/* ---------- colors / themes / templates ---------- */
+function renderColorList() {
+  const L = $('#colorList');
+  L.innerHTML = '';
+  cfg.wheel.colors.forEach((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'color-item';
+    d.innerHTML = `<label class="swatch" style="--c:${esc(c)}" title="Change color"><input type="color" value="${esc(c)}" aria-label="Wheel color ${i + 1}" /></label>
+      <button type="button" class="remove" aria-label="Remove color ${i + 1}" title="Remove">${svg('x')}</button>`;
+    const inp = d.querySelector('input');
+    inp.addEventListener('input', () => { cfg.wheel.colors[i] = inp.value; d.firstElementChild.style.setProperty('--c', inp.value); applyConfig(); });
+    const rm = d.querySelector('.remove');
+    rm.hidden = cfg.wheel.colors.length <= 1;
+    rm.onclick = () => { cfg.wheel.colors.splice(i, 1); applyConfig(); renderColorList(); };
+    L.appendChild(d);
+  });
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'add-color'; add.title = 'Add a color'; add.setAttribute('aria-label', 'Add a color');
+  add.innerHTML = svg('plus');
+  add.onclick = () => { cfg.wheel.colors.push(cfg.wheel.colors[cfg.wheel.colors.length - 1] || '#888888'); applyConfig(); renderColorList(); $('#colorList .color-item:last-of-type input').click(); };
+  L.appendChild(add);
+}
+function themeCSS(mode, colors) {
+  return wheelCSS({ wheel: { colorMode: mode, colors }, segments: Array.from({ length: mode === 'cycle' ? Math.max(8, colors.length) : 12 }, () => ({ label: '', weight: 1 })) });
+}
+function renderThemeGrid() {
+  $('#themeGrid').innerHTML = THEMES.map(([name, mode, colors], i) =>
+    `<button type="button" class="theme" data-theme="${i}" aria-pressed="false"><span class="mini-wheel" style="background:${themeCSS(mode, colors)}"></span>${esc(name)}</button>`).join('');
+  $$('#themeGrid .theme').forEach(b => (b.onclick = () => {
+    const [name, mode, colors] = THEMES[+b.dataset.theme];
+    withUndo(`Applied the ${name} theme`, () => {
+      cfg.wheel.colorMode = mode; cfg.wheel.colors = colors.slice();
+      cfg.segments.forEach(s => delete s.color);
+      applyConfig(); renderColorList(); syncControls();
+    });
+  }));
+}
+function renderTemplateRow() {
+  $('#templateRow').innerHTML = PRESETS.map(([name, c], i) =>
+    `<button type="button" class="template" data-preset="${i}"><span class="mini-wheel" style="background:${wheelCSS(c)}"></span>${esc(name)}</button>`).join('');
+  $$('#templateRow .template').forEach(b => (b.onclick = () => {
+    const [name, c] = PRESETS[+b.dataset.preset];
+    withUndo(`Loaded the “${name}” template`, () => replaceConfig(clone(c)));
+  }));
+}
+function renderEmojiGrid() {
+  $('#emojiGrid').innerHTML = `<button type="button" class="emoji" data-emoji="" title="No icon" aria-label="No icon">${svg('ban')}</button>`
+    + EMOJI.map(e => `<button type="button" class="emoji" data-emoji="${e}" aria-label="Use ${e}">${e}</button>`).join('');
+  $$('#emojiGrid .emoji').forEach(b => (b.onclick = () => { cfg.header.icon = b.dataset.emoji; applyConfig(); syncControls(); }));
+}
+function renderFontSelect() {
+  const sel = $('#fontSelect');
+  const opts = FONTS.slice();
+  if (!opts.some(f => f[1] === cfg.font)) opts.push(['Custom', cfg.font]);
+  sel.innerHTML = opts.map(([n, v]) => `<option value="${esc(v)}" style="font-family:${esc(v)}">${esc(n)}</option>`).join('');
+  sel.value = cfg.font;
+}
+function renderWinnerSelect() {
+  const sel = $('#winnerSelect');
+  const labels = [...new Set(cfg.segments.filter(s => +s.weight > 0 && String(s.label).trim()).map(s => String(s.label).trim()))];
+  sel.innerHTML = `<option value="">Random</option>` + labels.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
+  const fixed = cfg.result.mode === 'fixed' ? String(cfg.result.fixedLabel).trim() : '';
+  sel.value = labels.includes(fixed) ? fixed : '';
+}
+
+/* ---------- generic bindings ---------- */
+function bindControls() {
+  $$('[data-bind]').forEach(el => {
+    const path = el.dataset.bind;
+    const ev = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
+    el.addEventListener(ev, () => {
+      let v = el.type === 'checkbox' ? el.checked : el.value;
+      if (el.type === 'range' || el.type === 'number') v = parseFloat(v) || 0;
+      set(path, v);
+      if (el.type === 'color') el.closest('.swatch')?.style.setProperty('--c', v);
+      applyConfig(); syncOutputs(); syncVisibility();
+    });
+  });
+  $$('[data-seg]').forEach(g => {
+    g.setAttribute('role', 'group');
+    g.querySelectorAll('button').forEach(b => {
+      b.type = 'button';
+      b.addEventListener('click', () => { const raw = b.dataset.value; set(g.dataset.seg, raw !== '' && !isNaN(+raw) ? +raw : raw); applyConfig(); syncControls(); });
+    });
+  });
+}
+function syncOutputs() { $$('output[data-for]').forEach(o => (o.textContent = fmt(o.dataset.fmt, get(o.dataset.for)))); }
+function syncVisibility() {
+  $$('[data-show]').forEach(el => {
+    const [p, vals] = el.dataset.show.split('=');
+    el.hidden = vals === undefined ? !get(p) : !vals.split('|').includes(String(get(p)));
+  });
+}
+function syncControls() {
+  $$('[data-bind]').forEach(el => {
+    if (el === document.activeElement && el.type === 'text') return;
+    const v = get(el.dataset.bind);
+    if (el.type === 'checkbox') el.checked = !!v;
+    else el.value = v ?? '';
+    if (el.type === 'color') el.closest('.swatch')?.style.setProperty('--c', v);
+  });
+  $$('[data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(get(g.dataset.seg)) === b.dataset.value)));
+  const icon = cfg.header.icon || '', isImg = /^(https?:|data:|\.{0,2}\/)/.test(icon);
+  $$('#emojiGrid .emoji').forEach(b => b.setAttribute('aria-pressed', !isImg && b.dataset.emoji === icon));
+  if (document.activeElement !== $('#iconText')) $('#iconText').value = isImg || EMOJI.includes(icon) ? '' : icon;
+  $('#iconUploadBtn').innerHTML = isImg ? `<img src="${esc(icon)}" alt="" style="width:20px;height:20px;object-fit:contain" />Change image` : `${svg('upload')}Upload image`;
+  syncOutputs(); syncVisibility(); refreshDerived();
+}
+function refreshDerived() {
+  refreshSliceRows();
+  const speed = Object.keys(SPEEDS).find(k => SPEEDS[k].duration === +cfg.spin.duration && SPEEDS[k].rotations === +cfg.spin.rotations) || 'custom';
+  $$('#speedSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.speed === speed));
+  $$('#themeGrid .theme').forEach(b => {
+    const [, mode, colors] = THEMES[+b.dataset.theme];
+    b.setAttribute('aria-pressed', mode === cfg.wheel.colorMode && colors.join() === cfg.wheel.colors.join());
+  });
+  $('#overrideRow').hidden = !cfg.segments.some(s => s.color);
+  const img = cfg.background.image;
+  $('#bgThumb').style.backgroundImage = img ? `url("${img}")` : '';
+  $('#bgThumb').innerHTML = img ? '' : svg('image');
+  $('#bgDropTitle').textContent = img ? 'Replace photo' : 'Upload a photo';
+  $('#bgRemoveRow').hidden = !img;
+}
+function renderAll() {
+  renderSliceList(); renderColorList(); renderWinnerSelect(); renderFontSelect(); syncControls();
+}
+
+/* ---------- tabs ---------- */
+function selectTab(tab, focus) {
+  $$('.tab').forEach(t => {
+    const on = t === tab;
+    t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
+    $('#' + t.getAttribute('aria-controls')).hidden = !on;
+  });
+  $('.panels').scrollTop = 0;
+  if (focus) tab.focus();
+}
+$$('.tab').forEach((t, i, all) => {
+  t.onclick = () => selectTab(t);
+  t.onkeydown = e => {
+    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (d) { e.preventDefault(); selectTab(all[(i + d + all.length) % all.length], true); }
+  };
+});
+
+/* ---------- spin feedback ---------- */
+function onSpinStart() { if (!recording) setStatus('Spinning…'); $('#spinBtn').disabled = true; }
+function onSpinEnd(win) {
+  $('#spinBtn').disabled = recording;
+  if (!recording) setStatus(`Landed on <b>${esc(segs[win]?.label || '—')}</b>`);
+}
 
 /* ---------- events ---------- */
+$('#spinBtn').onclick = () => { if (!recording) spin(); };
+$('#downloadBtn').onclick = recordVideo;
 canvas.addEventListener('click', e => {
+  if (recording) return;
   const rc = canvas.getBoundingClientRect(), k = W / rc.width;
   const x = (e.clientX - rc.left) * k - CX, y = (e.clientY - rc.top) * k - CY;
-  if (!recording && x * x + y * y <= R * R) spin();
+  if (x * x + y * y <= R * R) spin();
 });
-$('#gear').onclick = togglePanel;
+canvas.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !recording) { e.preventDefault(); spin(); } });
 window.addEventListener('keydown', e => {
-  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-  if (e.code === 'Space') { e.preventDefault(); if (!recording) spin(); }
-  else if (e.key === 'v' || e.key === 'V') recordVideo();
-  else if ((e.key === 'r' || e.key === 'R') && !recording) resetWheel();
-  else if (e.key === 'e' || e.key === 'E') togglePanel();
+  if (e.target !== document.body) return;
+  if (e.code === 'Space' && !recording) { e.preventDefault(); spin(); }
   else if (e.key === 'h' || e.key === 'H') { document.body.classList.toggle('clean'); fit(); }
 });
+
+$('#addSlice').onclick = addSlice;
+$('#equalize').onclick = () => withUndo('Gave every slice the same chance', () => { cfg.segments.forEach(s => (s.weight = 1)); applyConfig(); renderSliceList(); });
+$('#pasteToggle').onclick = () => {
+  const box = $('#pasteBox'), open = box.hidden;
+  box.hidden = !open; $('#pasteToggle').setAttribute('aria-expanded', open);
+  if (open) $('#pasteText').focus();
+};
+$('#pasteCancel').onclick = () => { $('#pasteBox').hidden = true; $('#pasteToggle').setAttribute('aria-expanded', 'false'); };
+function pasteApply(replace) {
+  const items = parsePaste($('#pasteText').value);
+  if (!items.length) { toast('Paste at least one name first.'); $('#pasteText').focus(); return; }
+  withUndo(replace ? `Replaced the wheel with ${items.length} slices` : `Added ${items.length} slices`, () => {
+    cfg.segments = replace ? items : cfg.segments.concat(items);
+    applyConfig(); renderSliceList(); renderWinnerSelect();
+  });
+  $('#pasteText').value = ''; $('#pasteCancel').click();
+}
+$('#pasteReplace').onclick = () => pasteApply(true);
+$('#pasteAdd').onclick = () => pasteApply(false);
+$('#clearOverrides').onclick = () => withUndo('All slices use the wheel colors again', () => { cfg.segments.forEach(s => delete s.color); applyConfig(); });
+
+$$('#speedSeg button').forEach(b => (b.onclick = () => {
+  const k = b.dataset.speed;
+  if (k === 'custom') { $('#speedMore').open = true; b.setAttribute('aria-pressed', 'true'); return; }
+  Object.assign(cfg.spin, SPEEDS[k]); applyConfig(); syncControls();
+}));
+$('#winnerSelect').onchange = e => {
+  const v = e.target.value;
+  cfg.result.mode = v ? 'fixed' : 'random'; cfg.result.fixedLabel = v;
+  applyConfig();
+};
+
+$('#iconText').addEventListener('input', e => { cfg.header.icon = e.target.value.trim(); applyConfig(); syncControls(); });
+$('#iconUploadBtn').onclick = () => $('#iconFile').click();
+$('#iconFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try { cfg.header.icon = await fileToDataURL(f, 256, 256, 'image/png'); applyConfig(); syncControls(); }
+  catch { toast('That file isn’t an image we can use.'); }
+};
+
+async function useBackground(file) {
+  if (!file || !file.type.startsWith('image/')) { toast('That file isn’t an image we can use.'); return; }
+  try { cfg.background.image = await fileToDataURL(file, 1080, 1920); cfg.background.type = 'image'; applyConfig(); syncControls(); }
+  catch { toast('That file isn’t an image we can use.'); }
+}
+$('#bgDrop').onclick = () => $('#bgFile').click();
+$('#bgFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) useBackground(f); };
+['dragenter', 'dragover'].forEach(t => $('#bgDrop').addEventListener(t, e => { e.preventDefault(); $('#bgDrop').classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => $('#bgDrop').addEventListener(t, () => $('#bgDrop').classList.remove('over')));
+$('#bgDrop').addEventListener('drop', e => { e.preventDefault(); useBackground(e.dataTransfer.files[0]); });
+$('#bgRemove').onclick = () => withUndo('Photo removed', () => { cfg.background.image = ''; applyConfig(); syncControls(); });
+
+$('#shareBtn').onclick = async () => {
+  const c = clone(cfg); let stripped = false;
+  if ((c.background.image || '').startsWith('data:')) { c.background.image = ''; if (c.background.type === 'image') c.background.type = 'solid'; stripped = true; }
+  if ((c.header.icon || '').startsWith('data:')) { c.header.icon = ''; stripped = true; }
+  const url = location.origin + location.pathname + '?c=' + btoa(unescape(encodeURIComponent(JSON.stringify(c))));
+  try { await navigator.clipboard.writeText(url); toast(stripped ? 'Link copied. Uploaded images aren’t included, so use Save to share those.' : 'Link copied. Anyone with it can open this wheel.'); }
+  catch { prompt('Copy this link:', url); }
+};
+$('#saveBtn').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' }));
+  a.download = `${slug(cfg.header.label)}-wheel.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toast('Settings file saved. Use Open to load it again.');
+};
+$('#openBtn').onclick = () => $('#openFile').click();
+$('#openFile').onchange = e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  f.text().then(t => {
+    try { const next = deepMerge(DEFAULT_CONFIG, JSON.parse(t)); withUndo(`Opened “${f.name}”`, () => replaceConfig(next)); }
+    catch { toast('That file isn’t a wheel settings file.'); }
+  });
+};
+
+/* ---------- layout ---------- */
+function fit() {
+  const st = $('#stage'), w = st.clientWidth, h = st.clientHeight;
+  if (!w || !h) return;
+  const s = Math.min(w / W, h / H);
+  canvas.style.width = Math.floor(W * s) + 'px';
+  canvas.style.height = Math.floor(H * s) + 'px';
+}
+new ResizeObserver(fit).observe($('#stage'));
 
 /* ---------- boot ---------- */
 const params = new URLSearchParams(location.search);
 if (params.get('clean') === '1' || params.get('render') === '1') document.body.classList.add('clean');
+if (params.get('c')) history.replaceState(null, '', location.pathname);
+buildSegments();
+renderTemplateRow(); renderThemeGrid(); renderEmojiGrid(); bindControls();
+uiReady = true;
 applyConfig();
 resetWheel();
-buildPanel();
+renderAll();
 fit();
-if (document.fonts) document.fonts.ready.then(draw);
+if (!pickMime()) { $('#downloadBtn').disabled = true; $('#downloadBtn').title = 'Video export needs Chrome, Edge or Safari'; }
+window.addEventListener('load', () => ensureFont());
 if (params.get('render') !== '1' && (cfg.spin.autoSpin || params.get('autospin') === '1')) setTimeout(spin, (+cfg.spin.autoSpinDelay || 0) * 1000);
 </script>
 </body>

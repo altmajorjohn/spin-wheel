@@ -1,6 +1,6 @@
 // Renders the spin wheel template to a 1080x1920 MP4.
 // Usage:
-//   node render.mjs [config.json] [--preset "Rainbow palette"] [--out wheel.mp4]
+//   node render.mjs [config.json] [--preset "Type of God"] [--out wheel.mp4]
 //                   [--fps 30] [--hold-start 1] [--hold-end 2.5] [--winner "Label"]
 // fps / holds default to the "Video export" settings stored in the config.
 // config.json = the file produced by "Export JSON" in the settings panel (E).
@@ -23,7 +23,7 @@ const url = pathToFileURL(path.join(dir, 'index.html')).href + '?render=1';
 const config = configFile ? JSON.parse(readFileSync(configFile, 'utf8')) : null;
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 540, height: 960 }, deviceScaleFactor: 1 });
 
 // Virtual clock so every frame is exact regardless of capture speed.
 await page.addInitScript(({ config, preset }) => {
@@ -38,6 +38,7 @@ await page.addInitScript(({ config, preset }) => {
 }, { config, preset });
 
 await page.goto(url);
+await page.evaluate(() => ensureFont());
 await page.evaluate(() => document.fonts && document.fonts.ready);
 await page.evaluate(() => { resetWheel(); draw(); });
 const forced = opt('winner');
@@ -58,7 +59,7 @@ const spinAt = Math.round(holdStart * fps);
 for (let f = 0; f < total; f++) {
   if (f === spinAt) await page.evaluate(() => spin());
   if (f > 0) await page.evaluate(ms => window.__advance(ms), frameMs);
-  const buf = await page.screenshot({ type: 'png', clip: { x: 0, y: 0, width: 1080, height: 1920 } });
+  const buf = Buffer.from(await page.evaluate(() => canvas.toDataURL('image/png').slice(22)), 'base64');
   if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once('drain', r));
   if (f % fps === 0) process.stdout.write(`\r${Math.round((f / total) * 100)}%`);
 }
